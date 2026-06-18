@@ -1,2 +1,2 @@
-from . import auth, chat, history, import_excel, proverbs  # noqa: F401
+from . import auth, chat, history, import_excel, proverbs, reindex  # noqa: F401
 

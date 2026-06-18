@@ -9,16 +9,16 @@ class ChatRequest(BaseModel):
 
 class SourceItem(BaseModel):
     keyword: str | None = None
-    proverb: str
+    proverb: str | None = None
     meaning: str | None = None
     example: str | None = None
     score: float | None = None
 
 
 class ChatAnswer(BaseModel):
-    proverb: str
-    meaning_simple_mm: str
-    example_mm: str
+    proverb: str | None = None
+    meaning_simple_mm: str | None = None
+    example_mm: str | None = None
     sources: list[SourceItem] = []
 
 
