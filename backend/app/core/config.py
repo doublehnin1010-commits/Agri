@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     rag_top_k: int = 5
     rag_min_relevance_score: float = 0.75  # Guardrail: Minimum relevance threshold for retrieved proverbs
     rag_min_lexical_similarity: float = 0.5
+    rag_semantic_threshold: float = 0.5  # Semantic similarity threshold (0-1, higher=stricter matching)
 
     # If set, this email is assigned admin role on register.
     admin_email: str = ""

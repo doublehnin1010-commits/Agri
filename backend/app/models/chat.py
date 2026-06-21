@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -23,7 +25,7 @@ class ChatAnswer(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    answer: ChatAnswer
+    answer: dict[str, Any]
 
 
 class HistoryItem(BaseModel):

@@ -7,7 +7,6 @@ class Role(str, Enum):
 
 
 ADMIN_ONLY_PATHS: set[tuple[str, str]] = {
-    ("POST", "/import-excel"),
     ("POST", "/import-docx"),
     ("POST", "/proverbs"),
 }

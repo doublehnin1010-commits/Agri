@@ -26,5 +26,5 @@ async def chat(payload: ChatRequest, user_id: str = Depends(get_current_user_id)
         }
     )
 
-    return ChatResponse(answer=answer)
+    return {"answer": answer}
 

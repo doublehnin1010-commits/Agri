@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from typing import Any
 
@@ -8,11 +9,66 @@ from app.core.config import settings
 from app.db.chroma import get_collection
 from app.services.ollama import generate_answer, safe_json_from_llm
 from app.services.guardrails import (
-    is_context_relevant,
     validate_question,
     create_guardrailed_answer,
     create_no_result_answer,
     is_answer_valid,
+)
+
+
+PROVERB_KEYWORD_STOPWORDS = {
+    "စကား",
+    "စကားပုံ",
+}
+
+PROVERB_ONLY_PATTERNS = (
+    "ဘယ်လိုစကားပုံ",
+    "ဘာစကားပုံ",
+    "စကားပုံက ဘာ",
+    "စကားပုံဘာ",
+    "proverb only",
+)
+
+ROLE_QUESTION_PATTERNS = (
+    "မင်းကဘယ်သူလဲ",
+    "မင်းက ဘယ်သူလဲ",
+    "နင်ကဘယ်သူလဲ",
+    "နင်က ဘယ်သူလဲ",
+    "သင်ကဘယ်သူလဲ",
+    "သင်က ဘယ်သူလဲ",
+    "ဘယ်သူလဲ",
+    "ဒီsystem ကဘာအလုပ်လုပ်သလဲ",
+    "ဒီ system ကဘာအလုပ်လုပ်သလဲ",
+    "ဒီစနစ်ကဘာအလုပ်လုပ်သလဲ",
+    "ဘာအလုပ်လုပ်သလဲ",
+    "who are you",
+    "what are you",
+    "your role",
+    "what is this system",
+    "what does this system do",
+)
+
+TEACHER_STYLE_PREFIXES = (
+    "ကလေးတို့ရေ",
+    "ဆိုလိုတာက",
+    "လွယ်လွယ်ပြောရရင်",
+)
+
+MYANMAR_SYNONYM_GROUPS = (
+    ("တော်", "ထူးချွန်", "အစွမ်းထက်", "ထက်မြက်", "ပညာအရည်အသွေး", "ကျွမ်းကျင်"),
+    ("ကဲ့ရဲ့", "အပြစ်တင်", "အပြင်တင်", "ဝေဖန်", "မကောင်းပြော", "အတင်းပြော"),
+    ("ချီးမွမ်း", "ချီးမွန်း", "ချီးကျူး", "ကောင်းချီးပေး"),
+    ("ဆရာ", "ဆရာ့", "သင်ပေးသူ", "လက်ဦးဆရာ"),
+    ("တပည့်", "တပည့်", "ကျောင်းသား", "သင်ယူသူ"),
+    ("ကုသိုလ်", "ကောင်းမှု", "လှူဒါန်း", "အကျိုးပြု"),
+    ("ဝမ်း", "စားဝတ်နေရေး", "ဝမ်းရေး", "စားရေး"),
+)
+
+MYANMAR_NORMALIZATION_REPLACEMENTS = (
+    ("ဉ", "ဥ"),
+    ("ဿ", "သ"),
+    ("၏", "ရဲ့"),
+    ("၍", "ပြီး"),
 )
 
 
@@ -111,7 +167,83 @@ def upsert_proverbs(rows: list[dict[str, Any]]) -> tuple[int, int]:
 
 def retrieve_context(query: str, top_k: int | None = None) -> list[dict[str, Any]]:
     k = top_k or settings.rag_top_k
-    return _retrieve_lexical_context(query, top_k=k)
+    if not query or not query.strip():
+        return []
+
+    lexical_results = _retrieve_lexical_context(query, top_k=k)
+    rewritten_query = rewrite_query(query)
+    semantic_results = _retrieve_semantic_context(rewritten_query, top_k=k)
+
+    if not semantic_results and not lexical_results:
+        return []
+
+    merged = []
+    seen_proverbs: set[str] = set()
+
+    for item in lexical_results + semantic_results:
+        proverb_text = str(item.get("proverb") or "")
+        if not proverb_text or proverb_text in seen_proverbs:
+            continue
+        seen_proverbs.add(proverb_text)
+        merged.append(item)
+
+    return merged[:k]
+
+
+def rewrite_query(query: str) -> str:
+    """Rewrite a user query into a semantic search phrase or keywords."""
+    if not query or not query.strip():
+        return query
+
+    prompt = f"""
+Rewrite the following Myanmar user sentence into a short semantic search phrase or keyword list that captures the meaning.
+Keep it brief and focused on the intent and topic, not the exact words.
+Return only the rewritten query.
+
+User sentence:
+{query}
+
+Rewritten query:
+"""
+    try:
+        rewritten = generate_answer(prompt).strip()
+        return rewritten or query
+    except Exception:
+        return query
+
+
+def _retrieve_semantic_context(query: str, top_k: int) -> list[dict[str, Any]]:
+    if not query or not query.strip():
+        return []
+
+    try:
+        col = get_collection()
+        result = col.query(
+            query_texts=[query],
+            n_results=top_k,
+            include=["metadatas", "distances"]
+        )
+
+        if not result or not result.get("metadatas") or not result["metadatas"][0]:
+            return []
+
+        metadatas = result["metadatas"][0]
+        distances = result.get("distances", [[]])[0]
+        
+        matches: list[dict[str, Any]] = []
+        for idx, md in enumerate(metadatas):
+            if not md:
+                continue
+            distance = distances[idx] if idx < len(distances) else 1.0
+            item = _context_item_from_metadata(md, distance)
+            item["similarity"] = max(0.0, 1.0 - min(distance, 1.0))
+            if item["similarity"] < settings.rag_semantic_threshold:
+                continue
+            matches.append(item)
+
+        return matches[:top_k]
+    except Exception:
+        return []
 
 
 def _retrieve_lexical_context(query: str, top_k: int) -> list[dict[str, Any]]:
@@ -152,21 +284,37 @@ def _lexical_distance(normalized_query: str, metadata: dict[str, Any]) -> float 
     if not searchable:
         return None
 
-    if normalized_query in searchable:
-        return 0.0
-    if searchable in normalized_query:
+    query_variants = _search_text_variants(normalized_query)
+    searchable_variants = _search_text_variants(searchable)
+
+    if _has_variant_substring_match(query_variants, searchable_variants):
         return 0.0
 
-    tokens = [token for token in normalized_query.split() if len(token) > 1]
+    proverb_keyword_score = _proverb_keyword_similarity(query_variants, metadata)
+    synonym_score = _synonym_similarity(normalized_query, searchable)
+
+    searchable_compacts = [_compact_search_text(text) for text in searchable_variants]
+    tokens = [
+        token
+        for variant in query_variants
+        for token in variant.split()
+        if len(token) > 1
+    ]
     token_score = 0.0
     if tokens:
-        matched = sum(1 for token in tokens if token in searchable)
+        matched = sum(
+            1
+            for token in tokens
+            if any(token in text or _compact_search_text(token) in compact for text, compact in zip(searchable_variants, searchable_compacts))
+        )
         token_score = matched / len(tokens)
 
-    compact_query = _compact_search_text(normalized_query)
-    compact_searchable = _compact_search_text(searchable)
-    ngram_score = _ngram_similarity(compact_query, compact_searchable)
-    best_similarity = max(token_score, ngram_score)
+    ngram_score = max(
+        _ngram_similarity(_compact_search_text(query), _compact_search_text(searchable_text))
+        for query in query_variants
+        for searchable_text in searchable_variants
+    )
+    best_similarity = max(proverb_keyword_score, synonym_score, token_score, ngram_score)
 
     if best_similarity == 0.0:
         return None
@@ -174,13 +322,135 @@ def _lexical_distance(normalized_query: str, metadata: dict[str, Any]) -> float 
     return 1.0 - best_similarity
 
 
+def _has_variant_substring_match(query_variants: list[str], searchable_variants: list[str]) -> bool:
+    for query in query_variants:
+        if not query:
+            continue
+        compact_query = _compact_search_text(query)
+        for searchable in searchable_variants:
+            if not searchable:
+                continue
+            if query in searchable or searchable in query:
+                return True
+            compact_searchable = _compact_search_text(searchable)
+            if compact_query in compact_searchable or compact_searchable in compact_query:
+                return True
+    return False
+
+
+def _proverb_keyword_similarity(query_variants: list[str], metadata: dict[str, Any]) -> float:
+    compact_queries = [_compact_search_text(query) for query in query_variants if query]
+    if not compact_queries:
+        return 0.0
+
+    fields = [
+        metadata.get("keyword"),
+        metadata.get("proverb"),
+    ]
+    searchable = _normalize_search_text(" ".join(str(field or "") for field in fields))
+    searchable_variants = _search_text_variants(searchable)
+    tokens = []
+    for variant in searchable_variants:
+        tokens.extend(
+            token
+            for token in variant.split()
+            if len(token) >= 4 and _compact_search_text(token) not in PROVERB_KEYWORD_STOPWORDS
+        )
+    tokens = list(dict.fromkeys(tokens))
+    if not tokens:
+        return 0.0
+
+    matched = sum(
+        1
+        for token in tokens
+        if any(_compact_search_text(token) in compact_query for compact_query in compact_queries)
+    )
+    if not matched:
+        return 0.0
+
+    return max(0.65, matched / len(tokens))
+
+
 def _normalize_search_text(text: str) -> str:
-    normalized = re.sub(r"[၊။!?.,;:\"'`(){}\[\]<>]", " ", text.strip().lower())
+    normalized = text.strip().lower()
+    normalized = _apply_myanmar_normalization_replacements(normalized)
+    normalized = re.sub(r"[၊။!?.,;:\"'`(){}\[\]<>/\\|+=_*&^%$#@~`-]", " ", normalized)
     return " ".join(normalized.split())
 
 
+def _apply_myanmar_normalization_replacements(text: str) -> str:
+    normalized = text
+    for source, target in MYANMAR_NORMALIZATION_REPLACEMENTS:
+        normalized = normalized.replace(source, target)
+    return normalized
+
+
+def _search_text_variants(text: str) -> list[str]:
+    variants = {text}
+    variants.add(_strip_optional_myanmar_marks(text))
+    return [variant for variant in variants if variant]
+
+
+def _strip_optional_myanmar_marks(text: str) -> str:
+    return re.sub(r"[့း္်ျြွှ]", "", text)
+
+
+def _synonym_similarity(query: str, searchable: str) -> float:
+    query_groups = _matched_synonym_group_indexes(query)
+    if not query_groups:
+        return 0.0
+
+    searchable_groups = _matched_synonym_group_indexes(searchable)
+    matched = query_groups & searchable_groups
+    if not matched:
+        return 0.0
+
+    if len(query_groups) == 1:
+        return 0.35
+
+    if len(matched) < 2:
+        return 0.0
+
+    return min(0.75, len(matched) / len(query_groups))
+
+
+def _matched_synonym_group_indexes(text: str) -> set[int]:
+    matched_groups: set[int] = set()
+
+    for index, group in enumerate(MYANMAR_SYNONYM_GROUPS):
+        if any(_contains_synonym_term(text, term) for term in group):
+            matched_groups.add(index)
+
+    return matched_groups
+
+
+def _contains_synonym_term(text: str, term: str) -> bool:
+    normalized_text = _normalize_search_text(text)
+    normalized_term = _normalize_search_text(term)
+    if not normalized_text or not normalized_term:
+        return False
+
+    tokens = normalized_text.split()
+    if normalized_term in tokens:
+        return True
+
+    compact_term = _compact_synonym_text(normalized_term)
+    if len(compact_term) <= 3:
+        return any(_compact_synonym_text(token).startswith(compact_term) for token in tokens)
+
+    return compact_term in _compact_synonym_text(normalized_text)
+
+
+def _compact_synonym_text(text: str) -> str:
+    compact = _apply_myanmar_normalization_replacements(text)
+    compact = re.sub(r"[့း]+", "", compact)
+    return re.sub(r"\s+", "", compact)
+
+
 def _compact_search_text(text: str) -> str:
-    return re.sub(r"\s+", "", text)
+    compact = _apply_myanmar_normalization_replacements(text)
+    compact = _strip_optional_myanmar_marks(compact)
+    return re.sub(r"\s+", "", compact)
 
 
 def _ngram_similarity(query: str, searchable: str, n: int = 3) -> float:
@@ -223,60 +493,120 @@ def _answer_from_best_source(sources: list[dict[str, Any]]) -> dict[str, Any]:
     best = sources[0]
     return create_guardrailed_answer(
         proverb=best.get("proverb"),
-        meaning_simple_mm=best.get("meaning"),
+        meaning_simple_mm=_teacher_style_meaning(best),
         example_mm=best.get("example"),
         sources=sources,
     )
 
 
+def _teacher_style_meaning(source: dict[str, Any]) -> str | None:
+    meaning = (source.get("meaning") or "").strip()
+    if not meaning:
+        return None
+
+    proverb = (source.get("proverb") or "").strip()
+    if "ဆရာ့ထက်" in proverb and "တပည့်" in proverb:
+        return "ကလေးတို့ရေ၊ တပည့်က ကြိုးစားလို့ ဆရာထက် ပိုတော်လာတဲ့အခါ ဒီစကားပုံကို သုံးတာပါ။"
+
+    return f"ကလေးတို့ရေ၊ ဒီစကားပုံက {meaning} လို့ ဆိုလိုတာပါ။"
+
+
+def _looks_teacher_styled(meaning: str | None) -> bool:
+    normalized_meaning = (meaning or "").strip()
+    return any(normalized_meaning.startswith(prefix) for prefix in TEACHER_STYLE_PREFIXES)
+
+
+def _asks_for_proverb_only(question: str) -> bool:
+    normalized_question = _normalize_search_text(question)
+    compact_question = _compact_search_text(normalized_question)
+
+    for pattern in PROVERB_ONLY_PATTERNS:
+        normalized_pattern = _normalize_search_text(pattern)
+        if normalized_pattern in normalized_question:
+            return True
+        if _compact_search_text(normalized_pattern) in compact_question:
+            return True
+
+    return False
+
+
+def _asks_about_role(question: str) -> bool:
+    normalized_question = _normalize_search_text(question)
+    compact_question = _compact_search_text(normalized_question)
+
+    for pattern in ROLE_QUESTION_PATTERNS:
+        normalized_pattern = _normalize_search_text(pattern)
+        if normalized_pattern in normalized_question:
+            return True
+        if _compact_search_text(normalized_pattern) in compact_question:
+            return True
+
+    return False
+
+
+def _role_answer() -> dict[str, Any]:
+    return {
+        "proverb": None,
+        "meaning_simple_mm": (
+            "ကလေးတို့ရေ၊ ကျွန်ုပ်က မြန်မာစကားပုံတွေကို ရှာပေးပြီး "
+            "အဓိပ္ပါယ်ကို လွယ်လွယ်ကူကူ ရှင်းပြပေးတဲ့ Myanmar Proverbs AI Tutor ပါ။ "
+            "ဒီစနစ်က မေးခွန်းနဲ့ သက်ဆိုင်တဲ့ စကားပုံကို ဒေတာထဲကနေ ရှာပြီး "
+            "ဆရာတစ်ယောက်လို နားလည်လွယ်အောင် ပြန်ဖြေပေးတာပါ။"
+        ),
+        "example_mm": None,
+        "sources": [],
+    }
+
+
 def rag_answer(user_question: str) -> dict[str, Any]:
     # Guardrail 1: Validate the question
-    is_valid, error_msg = validate_question(user_question)
+    is_valid, _error_msg = validate_question(user_question)
     if not is_valid:
         return create_no_result_answer()
+
+    if _asks_about_role(user_question):
+        return _role_answer()
 
     # Guardrail 2: Retrieve context
     sources = retrieve_context(user_question, top_k=settings.rag_top_k)
 
-    # Guardrail 3: Check if retrieved context is relevant
-    if not is_context_relevant(sources):
+    if not sources:
         return create_no_result_answer()
 
-    # Guardrail 4: Build prompt with guardrail instructions
+    if _asks_for_proverb_only(user_question):
+        best = sources[0]
+        return {
+            "proverb": best.get("proverb"),
+            "meaning_simple_mm": _teacher_style_meaning(best),
+            "example_mm": best.get("example"),
+        }
+
+    context_json = json.dumps(sources, ensure_ascii=False, indent=2)
     prompt = f"""
-You are a helpful Myanmar language tutor for kids who teaches about Myanmar proverbs ONLY.
+You are a Myanmar Proverbs AI Tutor.
 
-STRICT RULES:
-1. Answer ONLY about Myanmar proverbs from the provided context.
-2. If the user's question is not about proverbs, respond with error message.
-3. Use ONLY information from the retrieved context - never generate new proverbs.
-4. Always explain in simple Burmese suitable for children.
-5. Never provide information about other topics (politics, history, science, general knowledge).
+Use ONLY the context below.
+If there is no exact proverb match, choose the closest meaning.
+Return the best matching proverb with a warm, natural Burmese explanation.
+Explain like a kind teacher answering children.
+Do not copy the source meaning word-for-word.
+The meaning_simple_mm value must start with "ကလေးတို့ရေ၊" or "ဆိုလိုတာက".
+Use simple, friendly language and 1-2 short sentences.
+If the context does not contain a relevant proverb, return null for proverb and the standard not-found message.
 
-You MUST answer in Burmese (Myanmar).
-Return ONLY valid JSON (no markdown, no extra text).
-Do not include reasoning, markdown fences, or <think> tags.
+Context:
+{context_json}
 
-User question:
+User Question:
 {user_question}
 
-Retrieved proverbs (context):
-{sources}
-
-JSON schema:
+Answer in Burmese only, using JSON with these fields:
 {{
-  "proverb": "most relevant proverb (string)",
-  "meaning_simple_mm": "simple Burmese explanation for kids (string)",
-  "example_mm": "simple Burmese example sentence (string)",
-  "sources": [{{"keyword": "...", "proverb": "...", "meaning": "...", "example": "...", "score": 0.0}}]
+  "proverb": "...",
+  "meaning_simple_mm": "...",
+  "example_mm": "...",
+  "sources": [...]
 }}
-
-Rules:
-- Choose the best proverb from the retrieved context ONLY.
-- Keep meaning very simple using words children understand.
-- Use respectful Burmese and simple words.
-- Include the sources array (reuse the context you got).
-- If the question is NOT about proverbs, set proverb to null and meaning_simple_mm to "ဝမ်းနည်းပါတယ်။ ကျွန်ုပ်၏ စကားပုံဒေတာအတွင်း မတွေ့ရှိပါ။"
 """
 
     try:
@@ -285,11 +615,17 @@ Rules:
     except (ValueError, RuntimeError):
         return _answer_from_best_source(sources)
 
-    # Guardrail 5: Validate the generated answer
     if not is_answer_valid(answer):
-        return create_no_result_answer()
+        if not answer.get("proverb"):
+            return create_no_result_answer()
+        return _answer_from_best_source(sources)
 
-    # Guardrail 6: Ensure sources are included
+    best = sources[0]
+    source_meaning = (best.get("meaning") or "").strip()
+    answer_meaning = (answer.get("meaning_simple_mm") or "").strip()
+    if answer_meaning == source_meaning or not _looks_teacher_styled(answer_meaning):
+        answer["meaning_simple_mm"] = _teacher_style_meaning(best)
+
     if "sources" not in answer or not answer["sources"]:
         answer["sources"] = sources
 
