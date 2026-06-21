@@ -1,259 +1,315 @@
-# Myanmar Proverbs AI Tutor for Kids (MVP)
+# 🇲🇲 Myanmar Proverbs AI Tutor
 
-Production-ready MVP: **FastAPI + JWT + MongoDB + ChromaDB + Gemini (RAG)** with optional React (Vite) frontend.
+An AI-powered Retrieval-Augmented Generation (RAG) system that helps users understand Myanmar proverbs through natural language conversations.
 
-## Folder structure
+Built with FastAPI, ChromaDB, MongoDB, and Ollama, the system retrieves proverb knowledge from a curated dataset and explains meanings in simple, educational Myanmar language.
 
+---
+
+## ✨ Features
+
+* 📚 Myanmar Proverbs Knowledge Base
+* 🤖 AI-powered Question Answering (RAG)
+* 🔍 Semantic Search with ChromaDB
+* 🇲🇲 Myanmar Language Optimized Retrieval
+* 📄 DOCX Dataset Import Support
+* 🔐 JWT Authentication & Role-Based Access Control
+* 👨‍💼 Admin Dataset Management
+* 💬 Chat History Storage
+* 🚫 Hallucination Prevention Guardrails
+* ⚡ FastAPI REST API
+
+---
+
+## 🏗️ System Architecture
+
+```text
+User Question
+      │
+      ▼
+ FastAPI API
+      │
+      ▼
+ Semantic Search
+   (ChromaDB)
+      │
+      ▼
+ Relevant Proverbs
+      │
+      ▼
+ Ollama / Qwen
+      │
+      ▼
+ AI Generated Answer
 ```
-RAG/
-  backend/
-    app/
-      core/
-        config.py
-        security.py
-      db/
-        mongodb.py
-        chroma.py
-      models/
-        user.py
-        chat.py
-      routers/
-        auth.py
-        chat.py
-        import_excel.py
-        history.py
-      services/
-        gemini.py
-        rag.py
-      main.py
-    requirements.txt
-    .env.example
-  frontend/               # optional
-    index.html
-    package.json
-    vite.config.js
-    src/
-      main.jsx
-      api.js
-      App.jsx
-      pages/
-        Login.jsx
-        Chat.jsx
-      styles.css
-  render.yaml             # optional (Render blueprint)
+
+---
+
+## 🛠️ Technology Stack
+
+| Category        | Technology    |
+| --------------- | ------------- |
+| Backend         | FastAPI       |
+| Vector Database | ChromaDB      |
+| Database        | MongoDB       |
+| LLM             | Ollama + Qwen |
+| Authentication  | JWT           |
+| Validation      | Pydantic      |
+| File Processing | python-docx   |
+
+---
+
+## 📂 Project Structure
+
+```text
+backend/
+├── app/
+│   ├── core/
+│   ├── db/
+│   ├── middleware/
+│   ├── models/
+│   ├── routers/
+│   ├── services/
+│   └── main.py
+│
+├── requirements.txt
+├── .env.example
+├── GUARDRAILS.md
+├── SEMANTIC_SEARCH_GUIDE.md
+├── test_guardrails.py
+└── test_semantic_search.py
 ```
 
-## What this app does (RAG in simple words)
+---
 
-When a user asks a question like “ငါးနဲ့ပတ်သက်တဲ့ စကားပုံ”:
+## 🚀 Getting Started
 
-1. We **embed** the user query into a vector (numbers).
-2. We **search ChromaDB** to find the most similar proverb rows from the Excel dataset.
-3. We send those retrieved proverbs as **context** to **Gemini**.
-4. Gemini generates:
-   - the relevant proverb(s)
-   - meaning in **simple Burmese**
-   - an example sentence
-5. We return the answer and also store the conversation in **MongoDB**.
-
-## Excel dataset format (example)
-
-Your `.xlsx` must contain these columns exactly:
-
-| keyword | proverb | meaning | example |
-|---|---|---|---|
-| ငါး | ငါးကြီးက ငါးသေးကို စား | အင်အားကြီးသူက အင်အားနည်းသူကို ဖိအားပေးတတ် | အလုပ်မှာ အကြီးက အငယ်ကို ဖိအားပေးတာ ငါးကြီးက ငါးသေးကို စား လိုပါပဲ |
-
-## Environment variables
-
-Copy `backend/.env.example` to `backend/.env` for local dev.
-
-## Run locally (backend)
+### 1. Clone Repository
 
 ```bash
-cd backend
-python -m venv .venv
-source .venv/Scripts/activate   # Windows Git Bash
-pip install -r requirements.txt
+git clone https://github.com/yourusername/myanmar-proverbs-ai-tutor.git
 
+cd myanmar-proverbs-ai-tutor/backend
+```
+
+### 2. Create Virtual Environment
+
+```bash
+python -m venv .venv
+```
+
+### Windows
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+### Linux / Mac
+
+```bash
+source .venv/bin/activate
+```
+
+---
+
+### 3. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+### 4. Configure Environment
+
+```bash
+cp .env.example .env
+```
+
+Required variables:
+
+```env
+MONGODB_URI=
+JWT_SECRET_KEY=
+OLLAMA_BASE_URL=
+OLLAMA_MODEL=
+CHROMA_PERSIST_DIR=
+CHROMA_COLLECTION_NAME=
+```
+
+---
+
+### 5. Pull LLM Model
+
+```bash
+ollama pull qwen3
+```
+
+---
+
+### 6. Run Application
+
+```bash
 uvicorn app.main:app --reload
 ```
 
-Open docs: `http://127.0.0.1:8000/docs`
+API Documentation:
 
-## Run locally (frontend - optional)
+```text
+http://localhost:8000/docs
+```
+
+---
+
+## 📄 Dataset Format
+
+The system imports two DOCX files:
+
+### Proverbs
+
+```text
+ဆရာ့ထက် တပည့်လက်စောင်းထက်
+ကုသိုလ်လည်းရ၊ ဝမ်းလည်းဝ
+```
+
+### Meanings
+
+```text
+တပည့်ဖြစ်သူ၏ ပညာအရည်အသွေးက ဆရာ့ထက် ပိုမိုထက်မြက်နေခြင်းကို ဆိုလိုပါသည်။
+အသက်မွေးဝမ်းကျောင်းပြုရာ၌ ကုသိုလ်နှင့် ဝင်ငွေ နှစ်မျိုးလုံး ရရှိခြင်းကို ဆိုလိုသည်။
+```
+
+Each proverb is matched with the corresponding meaning based on paragraph order.
+
+---
+
+## 🔐 Authentication
+
+Protected endpoints require JWT access tokens.
+
+```http
+Authorization: Bearer <token>
+```
+
+Admin-only operations:
+
+* Import Dataset
+* Reindex Collection
+* Manage Proverbs
+* Delete Dataset
+
+---
+
+## 📡 API Endpoints
+
+### Authentication
+
+| Method | Endpoint  |
+| ------ | --------- |
+| POST   | /register |
+| POST   | /login    |
+
+### Chat
+
+| Method | Endpoint |
+| ------ | -------- |
+| POST   | /chat    |
+| GET    | /history |
+
+### Dataset
+
+| Method | Endpoint        |
+| ------ | --------------- |
+| POST   | /import-docx    |
+| POST   | /reindex        |
+| POST   | /reindex/upload |
+| DELETE | /delete/file    |
+
+### Proverbs
+
+| Method | Endpoint       |
+| ------ | -------------- |
+| POST   | /proverbs      |
+| PUT    | /proverbs/{id} |
+
+---
+
+## 🛡️ Guardrails
+
+The system follows strict retrieval rules:
+
+✅ Relevant proverb found → Answer returned
+
+✅ Meaning request → Meaning explained
+
+✅ System-related question → Tutor explanation
+
+❌ Unrelated question → Not Found
+
+❌ Missing proverb → Not Found
+
+This prevents hallucinated answers.
+
+---
+
+## 🧪 Testing
+
+Run Guardrail Tests:
 
 ```bash
-cd frontend
-npm install
-npm run dev
+python test_guardrails.py
 ```
 
-Set `VITE_API_BASE_URL` in `frontend/.env` (example: `http://127.0.0.1:8000`).
-
-## API overview
-
-- `POST /register`
-- `POST /login`
-- `POST /import-excel` (JWT required)
-- `POST /chat` (JWT required)
-- `GET /history` (JWT required)
-
-## API examples
-
-### Register
-
-**Request**
-
-```json
-{
-  "email": "kidparent@example.com",
-  "password": "StrongPass123",
-  "name": "Parent"
-}
-```
-
-**Response**
-
-```json
-{
-  "id": "665f...ab",
-  "email": "kidparent@example.com",
-  "name": "Parent"
-}
-```
-
-### Login
-
-**Request**
-
-```json
-{
-  "email": "kidparent@example.com",
-  "password": "StrongPass123"
-}
-```
-
-**Response**
-
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "bearer"
-}
-```
-
-### Import Excel (upload)
-
-`POST /import-excel` with `multipart/form-data`
-
-- form field: `file` = your `.xlsx`
-- header: `Authorization: Bearer <token>`
-
-**Response**
-
-```json
-{
-  "inserted": 1200,
-  "skipped": 0,
-  "collection": "proverbs"
-}
-```
-
-### Chat (RAG)
-
-**Request**
-
-```json
-{
-  "message": "ငါးနဲ့ပတ်သက်တဲ့ စကားပုံ"
-}
-```
-
-**Response**
-
-```json
-{
-  "answer": {
-    "proverb": "....",
-    "meaning_simple_mm": "....",
-    "example_mm": "....",
-    "sources": [
-      {
-        "keyword": "ငါး",
-        "proverb": "....",
-        "meaning": "....",
-        "example": "....",
-        "score": 0.12
-      }
-    ]
-  }
-}
-```
-
-## Deployment (Render + MongoDB Atlas)
-
-### 1) MongoDB Atlas setup
-
-- Create a free cluster in MongoDB Atlas.
-- Create a database user (username/password).
-- Add IP allowlist:
-  - For MVP: allow `0.0.0.0/0` (later restrict).
-- Copy your connection string, e.g.:
-  - `mongodb+srv://USER:PASS@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority`
-
-### 2) Get a Gemini API key
-
-- In Google AI Studio, create an API key.
-- Keep it for `GEMINI_API_KEY`.
-
-### 3) Push to GitHub
+Run Semantic Search Tests:
 
 ```bash
-git init
-git add .
-git commit -m "MVP: Myanmar Proverbs AI Tutor (RAG)"
-git branch -M main
-git remote add origin <your-repo>
-git push -u origin main
+python test_semantic_search.py
 ```
 
-### 4) Deploy on Render (recommended)
+---
 
-Option A (Blueprint):
-- In Render, click **New +** → **Blueprint**
-- Connect your GitHub repo
-- Render will read `render.yaml`
+## 🚀 Deployment
 
-Option B (Manual Web Service):
-- Create a **Web Service**
-- Root directory: `backend`
-- Build command:
-  - `pip install -r requirements.txt`
-- Start command:
-  - `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+Supported platforms:
 
-### 5) Set environment variables on Render
+* Railway
+* Render
+* VPS
+* Docker
 
-Set these (same as `.env.example`):
+Production requirements:
 
-- `MONGODB_URI`
-- `MONGODB_DB_NAME`
-- `JWT_SECRET_KEY`
-- `JWT_EXPIRES_MINUTES`
-- `GEMINI_API_KEY`
-- `GEMINI_MODEL`
-- `GEMINI_EMBED_MODEL`
-- `CHROMA_PERSIST_DIR`
-- `CHROMA_COLLECTION_NAME`
-- `RAG_TOP_K`
+* MongoDB
+* Ollama Server
+* Persistent Chroma Storage
+* Environment Variables
 
-### 6) Production health check
+---
 
-After deploy, open:
-- `https://<your-render-service>/docs`
+## 🔮 Future Improvements
 
-## Notes
+* Voice Input (Speech-to-Text)
+* Telegram Bot Integration
+* Multi-LLM Support
+* Example Generation
+* User Feedback Collection
+* Advanced Semantic Ranking
+* Fine-Tuned Myanmar Embedding Models
 
-- ChromaDB persistence is local to the Render instance. For an MVP this is OK; for production scaling you’d move vectors to a managed vector DB or use Render persistent disk.
+---
 
+## 👨‍💻 Author
+
+**Zarni Maung**
+
+Final Year Computer Science Student
+
+Polytechnic University (Myeik)
+
+GitHub: https://github.com/zaenimaung1
+
+---
+
+## 📜 License
+
+This project is licensed under the MIT License.
