@@ -52,7 +52,7 @@ python test_semantic_search.py
 
 ### Option 2: Manual Test via API
 ```bash
-curl -X POST http://localhost:8000/chat \
+curl -X POST http://localhost:8000/api/v1/chat \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -d '{"message": "ဦးမောင်မောင်ကို လူတွေကနေ သူကို ကဲ့ရဲ့အပြစ်တင်နေသည်"}'

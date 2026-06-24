@@ -48,6 +48,18 @@ ROLE_QUESTION_PATTERNS = (
     "what does this system do",
 )
 
+TRANSLATE_TO_MYANMAR_PATTERNS = (
+    "မြန်မာလို",
+    "မြန်မာဘာသာ",
+    "myanmar လို",
+    "in myanmar",
+    "translate to myanmar",
+    "explain in myanmar",
+    "ပြန်ရှင်းပြ",
+    "မြန်မာလိုရှင်းပြ",
+    "မြန်မာလို ပြန်ရှင်းပြ",
+)
+
 TEACHER_STYLE_PREFIXES = (
     "ကလေးတို့ရေ",
     "ဆိုလိုတာက",
@@ -85,6 +97,113 @@ def _normalize_row(row: dict[str, Any]) -> dict[str, str | None]:
     if not proverb:
         raise ValueError("proverb is required")
     return {"keyword": keyword, "proverb": proverb, "meaning": meaning, "example": example}
+
+
+def _language_from_question(question: str) -> str:
+    normalized = (question or "").strip()
+    if not normalized:
+        return "my"
+
+    myanmar_chars = len(re.findall(r"[\u1000-\u109F]", normalized))
+    latin_chars = len(re.findall(r"[A-Za-z]", normalized))
+
+    if myanmar_chars > latin_chars:
+        return "my"
+    return "en"
+
+
+def _asks_for_translation_to_myanmar(question: str) -> bool:
+    normalized_question = _normalize_search_text(question)
+    compact_question = _compact_search_text(normalized_question)
+
+    for pattern in TRANSLATE_TO_MYANMAR_PATTERNS:
+        normalized_pattern = _normalize_search_text(pattern)
+        if normalized_pattern in normalized_question:
+            return True
+        if _compact_search_text(normalized_pattern) in compact_question:
+            return True
+
+    return False
+
+
+def _no_result_answer(language: str) -> dict[str, Any]:
+    if language == "en":
+        return {
+            "proverb": None,
+            "meaning_simple_mm": "Sorry, I could not find a matching proverb in my proverb database.",
+            "example_mm": None,
+            "sources": [],
+        }
+
+    return create_no_result_answer()
+
+
+def _teacher_style_meaning(source: dict[str, Any], language: str = "my") -> str | None:
+    meaning = (source.get("meaning") or "").strip()
+    if not meaning:
+        return None
+
+    proverb = (source.get("proverb") or "").strip()
+
+    if language == "en":
+        if "teacher" in proverb.lower() and "student" in proverb.lower():
+            return "A student can become more skilled or successful than the teacher."
+        return f"In simple words, this proverb means: {meaning}"
+
+    if "ဆရာ့ထက်" in proverb and "တပည့်" in proverb:
+        return "ကလေးတို့ရေ၊ တပည့်က ကြိုးစားလို့ ဆရာထက် ပိုတော်လာတဲ့အခါ ဒီစကားပုံကို သုံးတာပါ။"
+
+    return f"ကလေးတို့ရေ၊ ဒီစကားပုံက {meaning} လို့ ဆိုလိုတာပါ။"
+
+
+def _looks_teacher_styled(meaning: str | None) -> bool:
+    normalized_meaning = (meaning or "").strip()
+    return any(normalized_meaning.startswith(prefix) for prefix in TEACHER_STYLE_PREFIXES)
+
+
+def _role_answer(language: str) -> dict[str, Any]:
+    if language == "en":
+        return {
+            "proverb": None,
+            "meaning_simple_mm": (
+                "I’m Myanmar Proverbs AI Tutor. I find proverbs from the dataset and explain them in a simple, friendly way."
+            ),
+            "example_mm": None,
+            "sources": [],
+        }
+
+    return {
+        "proverb": None,
+        "meaning_simple_mm": (
+            "ကလေးတို့ရေ၊ ကျွန်ုပ်က မြန်မာစကားပုံတွေကို ရှာပေးပြီး "
+            "အဓိပ္ပါယ်ကို လွယ်လွယ်ကူကူ ရှင်းပြပေးတဲ့ Myanmar Proverbs AI Tutor ပါ။ "
+            "ဒီစနစ်က မေးခွန်းနဲ့ သက်ဆိုင်တဲ့ စကားပုံကို ဒေတာထဲကနေ ရှာပြီး "
+            "ဆရာတစ်ယောက်လို နားလည်လွယ်အောင် ပြန်ဖြေပေးတာပါ။"
+        ),
+        "example_mm": None,
+        "sources": [],
+    }
+
+
+def _translate_previous_answer(previous_answer: dict[str, Any], target_language: str) -> dict[str, Any]:
+    proverb = (previous_answer.get("proverb") or "").strip() or None
+    if not proverb:
+        return _no_result_answer(target_language)
+
+    meaning = (previous_answer.get("meaning_simple_mm") or "").strip()
+    example = (previous_answer.get("example_mm") or previous_answer.get("example") or "").strip()
+
+    if target_language == "en":
+        translated_meaning = _teacher_style_meaning({"proverb": proverb, "meaning": meaning}, "en")
+    else:
+        translated_meaning = _teacher_style_meaning({"proverb": proverb, "meaning": meaning}, "my")
+
+    return {
+        "proverb": proverb,
+        "meaning_simple_mm": translated_meaning,
+        "example_mm": example or None,
+        "sources": previous_answer.get("sources", []),
+    }
 
 
 def _build_chroma_record(row: dict[str, str | None]) -> tuple[str, str, dict[str, Any]]:
@@ -170,9 +289,14 @@ def retrieve_context(query: str, top_k: int | None = None) -> list[dict[str, Any
     if not query or not query.strip():
         return []
 
-    lexical_results = _retrieve_lexical_context(query, top_k=k)
-    rewritten_query = rewrite_query(query)
-    semantic_results = _retrieve_semantic_context(rewritten_query, top_k=k)
+    language = _language_from_question(query)
+    search_queries = _build_search_queries(query, language)
+
+    lexical_results: list[dict[str, Any]] = []
+    semantic_results: list[dict[str, Any]] = []
+    for search_query in search_queries:
+        lexical_results.extend(_retrieve_lexical_context(search_query, top_k=k))
+        semantic_results.extend(_retrieve_semantic_context(search_query, top_k=k))
 
     if not semantic_results and not lexical_results:
         return []
@@ -190,12 +314,32 @@ def retrieve_context(query: str, top_k: int | None = None) -> list[dict[str, Any
     return merged[:k]
 
 
-def rewrite_query(query: str) -> str:
+def _build_search_queries(query: str, language: str) -> list[str]:
+    queries = [query]
+    rewritten_query = rewrite_query(query, language)
+    if rewritten_query and rewritten_query.strip() and rewritten_query.strip() != query.strip():
+        queries.append(rewritten_query)
+    return queries
+
+
+def rewrite_query(query: str, language: str) -> str:
     """Rewrite a user query into a semantic search phrase or keywords."""
     if not query or not query.strip():
         return query
 
-    prompt = f"""
+    if language == "en":
+        prompt = f"""
+Translate the following English user sentence into a short Myanmar semantic search phrase or keyword list that captures the meaning.
+Keep it brief and focused on the intent and topic, not the exact words.
+Return only the rewritten query.
+
+User sentence:
+{query}
+
+Rewritten query:
+"""
+    else:
+        prompt = f"""
 Rewrite the following Myanmar user sentence into a short semantic search phrase or keyword list that captures the meaning.
 Keep it brief and focused on the intent and topic, not the exact words.
 Return only the rewritten query.
@@ -489,31 +633,14 @@ def _dedupe_context(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return deduped
 
 
-def _answer_from_best_source(sources: list[dict[str, Any]]) -> dict[str, Any]:
+def _answer_from_best_source(sources: list[dict[str, Any]], language: str = "my") -> dict[str, Any]:
     best = sources[0]
     return create_guardrailed_answer(
         proverb=best.get("proverb"),
-        meaning_simple_mm=_teacher_style_meaning(best),
+        meaning_simple_mm=_teacher_style_meaning(best, language),
         example_mm=best.get("example"),
         sources=sources,
     )
-
-
-def _teacher_style_meaning(source: dict[str, Any]) -> str | None:
-    meaning = (source.get("meaning") or "").strip()
-    if not meaning:
-        return None
-
-    proverb = (source.get("proverb") or "").strip()
-    if "ဆရာ့ထက်" in proverb and "တပည့်" in proverb:
-        return "ကလေးတို့ရေ၊ တပည့်က ကြိုးစားလို့ ဆရာထက် ပိုတော်လာတဲ့အခါ ဒီစကားပုံကို သုံးတာပါ။"
-
-    return f"ကလေးတို့ရေ၊ ဒီစကားပုံက {meaning} လို့ ဆိုလိုတာပါ။"
-
-
-def _looks_teacher_styled(meaning: str | None) -> bool:
-    normalized_meaning = (meaning or "").strip()
-    return any(normalized_meaning.startswith(prefix) for prefix in TEACHER_STYLE_PREFIXES)
 
 
 def _asks_for_proverb_only(question: str) -> bool:
@@ -544,45 +671,36 @@ def _asks_about_role(question: str) -> bool:
     return False
 
 
-def _role_answer() -> dict[str, Any]:
-    return {
-        "proverb": None,
-        "meaning_simple_mm": (
-            "ကလေးတို့ရေ၊ ကျွန်ုပ်က မြန်မာစကားပုံတွေကို ရှာပေးပြီး "
-            "အဓိပ္ပါယ်ကို လွယ်လွယ်ကူကူ ရှင်းပြပေးတဲ့ Myanmar Proverbs AI Tutor ပါ။ "
-            "ဒီစနစ်က မေးခွန်းနဲ့ သက်ဆိုင်တဲ့ စကားပုံကို ဒေတာထဲကနေ ရှာပြီး "
-            "ဆရာတစ်ယောက်လို နားလည်လွယ်အောင် ပြန်ဖြေပေးတာပါ။"
-        ),
-        "example_mm": None,
-        "sources": [],
-    }
+def _build_answer_prompt(context_json: str, user_question: str, language: str) -> str:
+    if language == "en":
+        return f"""
+You are a Myanmar Proverbs AI Tutor.
 
+Use ONLY the context below.
+If there is no exact proverb match, choose the closest meaning.
+Return the best matching proverb with a warm, natural English explanation.
+Explain like a kind teacher answering children.
+Do not copy the source meaning word-for-word.
+The meaning_simple_mm value must start with "In simple words," or "This proverb means".
+Use simple, friendly language and 1-2 short sentences.
+If the context does not contain a relevant proverb, return null for proverb and the standard not-found message.
 
-def rag_answer(user_question: str) -> dict[str, Any]:
-    # Guardrail 1: Validate the question
-    is_valid, _error_msg = validate_question(user_question)
-    if not is_valid:
-        return create_no_result_answer()
+Context:
+{context_json}
 
-    if _asks_about_role(user_question):
-        return _role_answer()
+User Question:
+{user_question}
 
-    # Guardrail 2: Retrieve context
-    sources = retrieve_context(user_question, top_k=settings.rag_top_k)
+Answer in English only, using JSON with these fields:
+{{
+  "proverb": "...",
+  "meaning_simple_mm": "...",
+  "example_mm": "...",
+  "sources": [...]
+}}
+"""
 
-    if not sources:
-        return create_no_result_answer()
-
-    if _asks_for_proverb_only(user_question):
-        best = sources[0]
-        return {
-            "proverb": best.get("proverb"),
-            "meaning_simple_mm": _teacher_style_meaning(best),
-            "example_mm": best.get("example"),
-        }
-
-    context_json = json.dumps(sources, ensure_ascii=False, indent=2)
-    prompt = f"""
+    return f"""
 You are a Myanmar Proverbs AI Tutor.
 
 Use ONLY the context below.
@@ -609,22 +727,58 @@ Answer in Burmese only, using JSON with these fields:
 }}
 """
 
+
+def rag_answer(user_question: str, previous_answer: dict[str, Any] | None = None) -> dict[str, Any]:
+    response_language = "my" if _asks_for_translation_to_myanmar(user_question) else _language_from_question(user_question)
+
+    # Guardrail 1: Validate the question
+    is_valid, _error_msg = validate_question(user_question)
+    if not is_valid:
+        return _no_result_answer(response_language)
+
+    if _asks_for_translation_to_myanmar(user_question) and previous_answer:
+        return _translate_previous_answer(previous_answer, "my")
+
+    if _asks_about_role(user_question):
+        return _role_answer(response_language)
+
+    # Guardrail 2: Retrieve context
+    sources = retrieve_context(user_question, top_k=settings.rag_top_k)
+
+    if not sources:
+        return _no_result_answer(response_language)
+
+    if _asks_for_proverb_only(user_question):
+        best = sources[0]
+        return {
+            "proverb": best.get("proverb"),
+            "meaning_simple_mm": _teacher_style_meaning(best, response_language),
+            "example_mm": best.get("example"),
+        }
+
+    context_json = json.dumps(sources, ensure_ascii=False, indent=2)
+    prompt = _build_answer_prompt(context_json, user_question, response_language)
+
     try:
         raw = generate_answer(prompt)
         answer = safe_json_from_llm(raw)
     except (ValueError, RuntimeError):
-        return _answer_from_best_source(sources)
+        return _answer_from_best_source(sources, response_language)
 
     if not is_answer_valid(answer):
         if not answer.get("proverb"):
-            return create_no_result_answer()
-        return _answer_from_best_source(sources)
+            return _no_result_answer(response_language)
+        return _answer_from_best_source(sources, response_language)
 
     best = sources[0]
     source_meaning = (best.get("meaning") or "").strip()
     answer_meaning = (answer.get("meaning_simple_mm") or "").strip()
-    if answer_meaning == source_meaning or not _looks_teacher_styled(answer_meaning):
-        answer["meaning_simple_mm"] = _teacher_style_meaning(best)
+    if answer_meaning == source_meaning:
+        answer["meaning_simple_mm"] = _teacher_style_meaning(best, response_language)
+    elif response_language == "en" and not answer_meaning.startswith("In simple words"):
+        answer["meaning_simple_mm"] = _teacher_style_meaning(best, response_language)
+    elif response_language == "my" and not _looks_teacher_styled(answer_meaning):
+        answer["meaning_simple_mm"] = _teacher_style_meaning(best, response_language)
 
     if "sources" not in answer or not answer["sources"]:
         answer["sources"] = sources

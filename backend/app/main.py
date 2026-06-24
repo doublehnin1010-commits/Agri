@@ -20,12 +20,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router, tags=["auth"])
-app.include_router(import_excel.router, tags=["dataset"])
-app.include_router(proverbs.router, tags=["proverbs"])
-app.include_router(chat.router, tags=["chat"])
-app.include_router(history.router, tags=["history"])
-app.include_router(reindex.router, tags=["dataset"])
+app.include_router(auth.router, prefix=settings.api_v1_prefix, tags=["auth"])
+app.include_router(import_excel.router, prefix=settings.api_v1_prefix, tags=["dataset"])
+app.include_router(proverbs.router, prefix=settings.api_v1_prefix, tags=["proverbs"])
+app.include_router(chat.router, prefix=settings.api_v1_prefix, tags=["chat"])
+app.include_router(history.router, prefix=settings.api_v1_prefix, tags=["history"])
+app.include_router(reindex.router, prefix=settings.api_v1_prefix, tags=["dataset"])
 
 
 @app.on_event("startup")

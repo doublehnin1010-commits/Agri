@@ -6,6 +6,7 @@ class Settings(BaseSettings):
 
     app_name: str = "Myanmar Proverbs AI Tutor"
     environment: str = "local"
+    api_v1_prefix: str = "/api/v1"
     allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     mongodb_uri: str

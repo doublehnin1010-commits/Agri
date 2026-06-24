@@ -4,6 +4,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from app.core.config import settings
 from app.core.roles import ADMIN_ONLY_PATHS, ADMIN_ONLY_PREFIXES, Role
 from app.core.security import decode_token
 
@@ -16,10 +17,11 @@ class RBACMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         path = request.url.path
+        rbac_path = path.removeprefix(settings.api_v1_prefix) or "/"
         method = request.method.upper()
 
-        is_admin_route = (method, path) in ADMIN_ONLY_PATHS or any(
-            method == m and path.startswith(prefix) for m, prefix in ADMIN_ONLY_PREFIXES
+        is_admin_route = (method, rbac_path) in ADMIN_ONLY_PATHS or any(
+            method == m and rbac_path.startswith(prefix) for m, prefix in ADMIN_ONLY_PREFIXES
         )
         if not is_admin_route:
             return await call_next(request)
