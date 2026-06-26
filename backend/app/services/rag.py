@@ -229,6 +229,29 @@ def add_proverb(row: dict[str, Any]) -> dict[str, Any]:
     return {"id": proverb_id, **normalized}
 
 
+def list_proverbs(limit: int = 500, offset: int = 0) -> list[dict[str, Any]]:
+    col = get_collection()
+    result = col.get(limit=max(1, min(limit, 5000)), offset=max(0, offset), include=["metadatas"])
+    ids = result.get("ids") or []
+    metadatas = result.get("metadatas") or []
+
+    items: list[dict[str, Any]] = []
+    for proverb_id, metadata in zip(ids, metadatas):
+        if not metadata:
+            continue
+        items.append(
+            {
+                "id": proverb_id,
+                "keyword": metadata.get("keyword"),
+                "proverb": metadata.get("proverb") or "",
+                "meaning": metadata.get("meaning"),
+                "example": metadata.get("example"),
+            }
+        )
+
+    return items
+
+
 def update_proverb(proverb_id: str, updates: dict[str, Any]) -> dict[str, Any]:
     col = get_collection()
     existing = col.get(ids=[proverb_id], include=["metadatas"])
@@ -495,11 +518,10 @@ def _proverb_keyword_similarity(query_variants: list[str], metadata: dict[str, A
     searchable_variants = _search_text_variants(searchable)
     tokens = []
     for variant in searchable_variants:
-        tokens.extend(
-            token
-            for token in variant.split()
-            if len(token) >= 4 and _compact_search_text(token) not in PROVERB_KEYWORD_STOPWORDS
-        )
+        for token in variant.split():
+            compact_token = _compact_search_text(token)
+            if len(compact_token) >= 4 and compact_token not in PROVERB_KEYWORD_STOPWORDS:
+                tokens.append(token)
     tokens = list(dict.fromkeys(tokens))
     if not tokens:
         return 0.0
@@ -507,12 +529,26 @@ def _proverb_keyword_similarity(query_variants: list[str], metadata: dict[str, A
     matched = sum(
         1
         for token in tokens
-        if any(_compact_search_text(token) in compact_query for compact_query in compact_queries)
+        if any(
+            _compact_search_text(token) in compact_query
+            or _has_meaningful_prefix_overlap(_compact_search_text(token), compact_query)
+            for compact_query in compact_queries
+        )
     )
     if not matched:
         return 0.0
 
     return max(0.65, matched / len(tokens))
+
+
+def _has_meaningful_prefix_overlap(left: str, right: str, min_length: int = 4) -> bool:
+    common_length = 0
+    for left_char, right_char in zip(left, right):
+        if left_char != right_char:
+            break
+        common_length += 1
+    shorter_length = min(len(left), len(right))
+    return common_length >= min_length and common_length / shorter_length >= 0.75
 
 
 def _normalize_search_text(text: str) -> str:
@@ -536,6 +572,8 @@ def _search_text_variants(text: str) -> list[str]:
 
 
 def _strip_optional_myanmar_marks(text: str) -> str:
+    # Keep medial marks because they can change word identity completely.
+    return re.sub(r"[\u1037\u1038\u1039\u103a]", "", text)
     return re.sub(r"[့း္်ျြွှ]", "", text)
 
 

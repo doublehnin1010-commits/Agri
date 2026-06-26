@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
+    conversation_id: str | None = None
 
 
 class SourceItem(BaseModel):
@@ -26,6 +27,9 @@ class ChatAnswer(BaseModel):
 
 class ChatResponse(BaseModel):
     answer: dict[str, Any]
+    conversation_id: str
+    title: str
+    created_at: datetime
 
 
 class HistoryItem(BaseModel):
