@@ -49,7 +49,7 @@ def test_semantic_retrieval():
         print()
     
     # Check if expected proverb is found
-    expected_proverb = "ကဲ့ရဲ့ခုနှစ်ရက်"
+    expected_proverb = "ကဲ့ရဲ့ ခုနစ်ရက်"
     found = False
     for result in results:
         if expected_proverb in result.get("proverb", ""):

@@ -8,7 +8,7 @@ from typing import Any
 import chromadb
 from chromadb.utils import embedding_functions
 
-from app.core.config import settings
+from app.core.config import BACKEND_DIR, settings
 
 
 class Chroma:
@@ -19,8 +19,15 @@ class Chroma:
 chroma = Chroma()
 
 
+def _resolve_chroma_path(path: str) -> str:
+    persist_path = Path(path)
+    if persist_path.is_absolute():
+        return str(persist_path)
+    return str(BACKEND_DIR / persist_path)
+
+
 def connect_chroma() -> None:
-    chroma.client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
+    chroma.client = chromadb.PersistentClient(path=_resolve_chroma_path(settings.chroma_persist_dir))
     embedding_fn = embedding_functions.DefaultEmbeddingFunction()
     chroma.collection = chroma.client.get_or_create_collection(
         name=settings.chroma_collection_name,
@@ -51,7 +58,7 @@ def delete_chroma_store() -> bool:
     chroma.collection = None
     chroma.client = None
 
-    persist_path = Path(settings.chroma_persist_dir)
+    persist_path = Path(_resolve_chroma_path(settings.chroma_persist_dir))
     if not persist_path.exists():
         return False
 

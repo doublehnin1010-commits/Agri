@@ -2,10 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.deps import require_admin
 from app.models.proverb import ProverbCreate, ProverbResponse, ProverbUpdate
-from app.services.rag import add_proverb, update_proverb
+from app.services.rag import add_proverb, list_proverbs, update_proverb
 
 
 router = APIRouter()
+
+
+@router.get("/proverbs", response_model=list[ProverbResponse])
+async def get_proverbs(limit: int = 500, offset: int = 0, _admin=Depends(require_admin)):
+    return [ProverbResponse(**item) for item in list_proverbs(limit=limit, offset=offset)]
 
 
 @router.post("/proverbs", response_model=ProverbResponse)
