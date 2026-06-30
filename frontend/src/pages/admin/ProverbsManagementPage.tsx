@@ -6,7 +6,7 @@ import {
   getPaginationRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Edit, LibraryBig, Loader2, Plus, Search } from "lucide-react";
+import { Edit, LibraryBig, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -14,13 +14,22 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getApiErrorMessage } from "../../api/client";
 import { EmptyState } from "../../components/EmptyState";
 import { Modal } from "../../components/Modal";
-import { createProverb, listProverbs, updateProverb, type ProverbPayload } from "../../services/proverbService";
+import {
+  createProverb,
+  deleteAllProverbs,
+  deleteProverb,
+  listProverbs,
+  updateProverb,
+  type ProverbPayload,
+} from "../../services/proverbService";
 import type { Proverb } from "../../types";
 
 export function ProverbsManagementPage() {
   const queryClient = useQueryClient();
   const [globalFilter, setGlobalFilter] = useState("");
   const [editing, setEditing] = useState<Proverb | null>(null);
+  const [deleting, setDeleting] = useState<Proverb | null>(null);
+  const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const { data = [], isLoading, isError, error } = useQuery({
     queryKey: ["proverbs"],
@@ -48,6 +57,26 @@ export function ProverbsManagementPage() {
     onError: (err) => toast.error(getApiErrorMessage(err)),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: deleteProverb,
+    onSuccess: (_, deletedId) => {
+      queryClient.setQueryData<Proverb[]>(["proverbs"], (current = []) => current.filter((item) => item.id !== deletedId));
+      toast.success("Proverb deleted");
+      setDeleting(null);
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err)),
+  });
+
+  const deleteAllMutation = useMutation({
+    mutationFn: deleteAllProverbs,
+    onSuccess: (response) => {
+      queryClient.setQueryData<Proverb[]>(["proverbs"], []);
+      toast.success(`${response.deleted} proverbs deleted`);
+      setIsDeleteAllOpen(false);
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err)),
+  });
+
   const columns = useMemo<ColumnDef<Proverb>[]>(
     () => [
       {
@@ -62,12 +91,22 @@ export function ProverbsManagementPage() {
       },
       {
         id: "actions",
-        header: "",
+        header: "Actions",
         cell: ({ row }) => (
-          <button type="button" className="btn-secondary px-3 py-2" onClick={() => setEditing(row.original)}>
-            <Edit className="h-4 w-4" aria-hidden="true" />
-            Edit
-          </button>
+          <div className="flex flex-wrap gap-2 items-center justify-center">
+            <button type="button" className="btn-secondary px-3 py-2" onClick={() => setEditing(row.original)}>
+              <Edit className="h-4 w-4" aria-hidden="true" />
+              Edit
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={() => setDeleting(row.original)}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+              Delete
+            </button>
+          </div>
         ),
       },
     ],
@@ -91,10 +130,21 @@ export function ProverbsManagementPage() {
           <h1 className="text-2xl font-bold text-slate-950">Proverbs Management</h1>
           <p className="mt-2 text-sm text-slate-500">Search, create, and edit proverb records used by the tutor.</p>
         </div>
-        <button type="button" className="btn-primary" onClick={() => setCreating(true)}>
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Create Proverb
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn-primary" onClick={() => setCreating(true)}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Create Proverb
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() => setIsDeleteAllOpen(true)}
+            disabled={!data.length || isLoading}
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+            Delete All
+          </button>
+        </div>
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -186,6 +236,30 @@ export function ProverbsManagementPage() {
           />
         ) : null}
       </Modal>
+
+      <Modal title="Delete Proverb" isOpen={Boolean(deleting)} onClose={() => setDeleting(null)}>
+        {deleting ? (
+          <ConfirmDelete
+            message="This proverb will be removed from the RAG collection."
+            target={deleting.proverb}
+            confirmLabel="Delete Proverb"
+            isSubmitting={deleteMutation.isPending}
+            onCancel={() => setDeleting(null)}
+            onConfirm={() => deleteMutation.mutate(deleting.id)}
+          />
+        ) : null}
+      </Modal>
+
+      <Modal title="Delete All Proverbs" isOpen={isDeleteAllOpen} onClose={() => setIsDeleteAllOpen(false)}>
+        <ConfirmDelete
+          message={`This will remove all ${data.length} proverb records from the RAG collection.`}
+          target="All proverb records"
+          confirmLabel="Delete All"
+          isSubmitting={deleteAllMutation.isPending}
+          onCancel={() => setIsDeleteAllOpen(false)}
+          onConfirm={() => deleteAllMutation.mutate()}
+        />
+      </Modal>
     </div>
   );
 }
@@ -235,5 +309,39 @@ function ProverbForm({ proverb, isSubmitting, onSubmit }: ProverbFormProps) {
         {isSubmitting ? "Saving..." : "Save Proverb"}
       </button>
     </form>
+  );
+}
+
+interface ConfirmDeleteProps {
+  message: string;
+  target: string;
+  confirmLabel: string;
+  isSubmitting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+function ConfirmDelete({ message, target, confirmLabel, isSubmitting, onCancel, onConfirm }: ConfirmDeleteProps) {
+  return (
+    <div className="space-y-5">
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+        <p className="text-sm font-semibold text-red-950">{message}</p>
+        <p className="mt-2 line-clamp-3 text-sm text-red-800">{target}</p>
+      </div>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <button type="button" className="btn-secondary" onClick={onCancel} disabled={isSubmitting}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={onConfirm}
+          disabled={isSubmitting}
+        >
+          <Trash2 className="h-4 w-4" aria-hidden="true" />
+          {isSubmitting ? "Deleting..." : confirmLabel}
+        </button>
+      </div>
+    </div>
   );
 }

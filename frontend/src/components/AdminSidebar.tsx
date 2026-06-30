@@ -1,4 +1,4 @@
-import { DatabaseZap, LayoutDashboard, LibraryBig, PanelLeftClose } from "lucide-react";
+import { Book, DatabaseZap, LayoutDashboard, LibraryBig, PanelLeftClose } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { Brand } from "./Brand";
 
@@ -9,6 +9,7 @@ interface AdminSidebarProps {
 
 const items = [
   { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
+  {label : "Open Chat" , to : "/dashboard" , icon : Book },
   { label: "Import Dataset", to: "/admin/import", icon: DatabaseZap },
   { label: "Proverbs Management", to: "/admin/proverbs", icon: LibraryBig },
 ];
@@ -38,7 +39,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
             <PanelLeftClose className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
-        <nav className="flex-1 space-y-1 p-3">
+        <nav className="flex-1 space-y-1 p-3 ">
           {items.map((item) => (
             <NavLink
               key={item.to}

@@ -1,9 +1,10 @@
 import { useMutation } from "@tanstack/react-query";
 import { BookOpenText, Loader2, SendHorizonal } from "lucide-react";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { getApiErrorMessage } from "../api/client";
 import { ChatMessages } from "../components/ChatMessages";
+import { VoiceButton } from "../components/VoiceButton";
 import { useHistory } from "../hooks/useHistory";
 import { sendChatMessage } from "../services/chatService";
 import type { HistoryMessage } from "../types/history";
@@ -12,6 +13,7 @@ import { getConversationTitle } from "../utils/history";
 
 export function ChatPage() {
   const [message, setMessage] = useState("");
+  const [isListening, setIsListening] = useState(false);
   const {
     currentConversation,
     appendMessage,
@@ -44,25 +46,42 @@ export function ChatPage() {
     onError: (error) => toast.error(getApiErrorMessage(error)),
   });
 
+  const { mutate, isPending } = mutation;
+
+  const sendMessage = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || isPending) return;
+
+      const userMessage: HistoryMessage = {
+        id: makeId("user"),
+        role: "user",
+        content: trimmed,
+        created_at: new Date().toISOString(),
+      };
+
+      appendMessage(userMessage);
+      setMessage("");
+      mutate({
+        message: trimmed,
+        conversationId: currentConversation?.id === "draft" ? undefined : currentConversation?.id,
+      });
+    },
+    [appendMessage, currentConversation?.id, isPending, mutate],
+  );
+
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    const trimmed = message.trim();
-    if (!trimmed || mutation.isPending) return;
-
-    const userMessage: HistoryMessage = {
-      id: makeId("user"),
-      role: "user",
-      content: trimmed,
-      created_at: new Date().toISOString(),
-    };
-
-    appendMessage(userMessage);
-    setMessage("");
-    mutation.mutate({
-      message: trimmed,
-      conversationId: currentConversation?.id === "draft" ? undefined : currentConversation?.id,
-    });
+    sendMessage(message);
   };
+
+  const handleVoiceTranscript = useCallback(
+    (transcript: string) => {
+      setMessage(transcript);
+      sendMessage(transcript);
+    },
+    [sendMessage],
+  );
 
   const handleNewChat = () => {
     startNewConversation();
@@ -71,13 +90,13 @@ export function ChatPage() {
 
   return (
     <main className="flex min-h-[calc(100vh-4rem)] flex-col">
-      <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="truncate text-lg font-bold text-slate-950">{title}</h1>
-            <p className="text-sm text-slate-500">Ask about Myanmar proverbs, meanings, examples, and usage.</p>
+      <div className="border-b border-slate-200 bg-white px-3 py-3 sm:px-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-base font-bold text-slate-950 sm:text-lg">{title}</h1>
+            <p className="text-xs text-slate-500 sm:text-sm">Ask about Myanmar proverbs, meanings, examples, and usage.</p>
           </div>
-          <button type="button" onClick={handleNewChat} className="btn-secondary">
+          <button type="button" onClick={handleNewChat} className="btn-secondary w-full sm:w-auto">
             <BookOpenText className="h-4 w-4" aria-hidden="true" />
             New Chat
           </button>
@@ -92,20 +111,38 @@ export function ChatPage() {
         />
       </section>
 
-      <form onSubmit={handleSubmit} className="border-t border-slate-200 bg-white p-4 sm:p-5">
-        <div className="mx-auto flex max-w-4xl items-end gap-3">
+      <form onSubmit={handleSubmit} className="border-t border-slate-200 bg-white p-3 sm:p-5">
+        <div className="mx-auto flex max-w-4xl flex-col gap-2 sm:gap-3">
           <label className="sr-only" htmlFor="chat-message">Message</label>
           <textarea
             id="chat-message"
             value={message}
             onChange={(event) => setMessage(event.target.value)}
             rows={1}
-            className="form-input max-h-40 min-h-12 resize-none py-3"
+            className="form-input max-h-40 min-h-11 w-full min-w-0 resize-none py-3 sm:min-h-12"
             placeholder="Ask about a Myanmar proverb..."
           />
-          <button type="submit" className="btn-primary h-12 px-4" disabled={!message.trim() || mutation.isPending} aria-label="Send message">
-            {mutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <SendHorizonal className="h-5 w-5" />}
-          </button>
+          <div className="flex items-center justify-between gap-2 sm:justify-end">
+            <p className="text-xs text-slate-500 sm:hidden" aria-live="polite">
+              {isListening ? "Listening..." : " "}
+            </p>
+            <div className="ml-auto flex items-center gap-2">
+              <VoiceButton
+                onTranscript={handleVoiceTranscript}
+                onInterimTranscript={setMessage}
+                disabled={mutation.isPending}
+                onListeningChange={setIsListening}
+              />
+              <button
+                type="submit"
+                className="btn-primary h-11 shrink-0 px-4 sm:h-12"
+                disabled={!message.trim() || mutation.isPending || isListening}
+                aria-label="Send message"
+              >
+                {mutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <SendHorizonal className="h-5 w-5" />}
+              </button>
+            </div>
+          </div>
         </div>
       </form>
     </main>

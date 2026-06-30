@@ -13,6 +13,7 @@ from app.services.guardrails import (
     create_no_result_answer,
     is_answer_valid,
 )
+from app.services.rag import rag_answer
 
 
 def test_validate_question():
@@ -116,6 +117,18 @@ def test_answer_validation():
     print("✓ Null values: PASS")
 
 
+def test_greeting_response():
+    """Greeting should return a friendly reply instead of a no-data error."""
+    print("\n=== Testing Greeting Response ===")
+
+    answer = rag_answer("Hello")
+
+    assert answer["proverb"] is None, "Greeting should not return a proverb"
+    assert answer["meaning_simple_mm"] is not None, "Greeting should include a friendly message"
+    assert "မင်္ဂလာပါ" in answer["meaning_simple_mm"] or "Hello" in answer["meaning_simple_mm"], "Greeting should be friendly"
+    print("✓ Greeting reply: PASS")
+
+
 def test_no_result_answer():
     """Test no-result answer response"""
     print("\n=== Testing No-Result Answer ===")
@@ -143,6 +156,7 @@ def run_all_tests():
         test_validate_question()
         test_context_relevance()
         test_answer_validation()
+        test_greeting_response()
         test_no_result_answer()
 
         print("\n╔═══════════════════════════════════════════════════════╗")

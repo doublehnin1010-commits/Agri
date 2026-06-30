@@ -9,7 +9,7 @@ import json
 import chromadb
 from chromadb.utils import embedding_functions
 from app.core.config import settings
-from app.services.ollama import generate_answer
+from app.services.llm import generate_answer
 from typing import Any
 
 def get_collection():

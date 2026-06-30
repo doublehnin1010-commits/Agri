@@ -4,11 +4,13 @@ import type { ImportResult } from "../types";
 export async function importDocx(
   proverbsFile: File,
   meaningsFile: File,
+  englishMeaningsFile: File,
   onProgress?: (progress: number) => void,
 ): Promise<ImportResult> {
   const formData = new FormData();
   formData.append("proverbs_file", proverbsFile);
   formData.append("meanings_file", meaningsFile);
+  formData.append("english_meanings_file", englishMeaningsFile);
 
   const { data } = await apiClient.post<ImportResult>("/import-docx", formData, {
     headers: { "Content-Type": "multipart/form-data" },

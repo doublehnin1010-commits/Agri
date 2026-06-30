@@ -5,16 +5,20 @@ import { getApiErrorMessage } from "../../api/client";
 import { importDocx } from "../../services/uploadService";
 import type { ImportResult } from "../../types";
 
-type FileKind = "proverbs" | "meanings";
+type FileKind = "proverbs" | "meanings" | "englishMeanings";
 
 export function ImportDatasetPage() {
   const [proverbsFile, setProverbsFile] = useState<File | null>(null);
   const [meaningsFile, setMeaningsFile] = useState<File | null>(null);
+  const [englishMeaningsFile, setEnglishMeaningsFile] = useState<File | null>(null);
   const [progress, setProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
 
-  const canUpload = useMemo(() => Boolean(proverbsFile && meaningsFile && !isUploading), [proverbsFile, meaningsFile, isUploading]);
+  const canUpload = useMemo(
+    () => Boolean(proverbsFile && meaningsFile && englishMeaningsFile && !isUploading),
+    [proverbsFile, meaningsFile, englishMeaningsFile, isUploading],
+  );
 
   const assignFile = (file: File, kind: FileKind) => {
     if (!file.name.toLowerCase().endsWith(".docx")) {
@@ -22,7 +26,8 @@ export function ImportDatasetPage() {
       return;
     }
     if (kind === "proverbs") setProverbsFile(file);
-    else setMeaningsFile(file);
+    else if (kind === "meanings") setMeaningsFile(file);
+    else setEnglishMeaningsFile(file);
   };
 
   const handleDrop = (event: DragEvent<HTMLLabelElement>, kind: FileKind) => {
@@ -32,12 +37,12 @@ export function ImportDatasetPage() {
   };
 
   const handleUpload = async () => {
-    if (!proverbsFile || !meaningsFile) return;
+    if (!proverbsFile || !meaningsFile || !englishMeaningsFile) return;
     setIsUploading(true);
     setProgress(0);
     setResult(null);
     try {
-      const response = await importDocx(proverbsFile, meaningsFile, setProgress);
+      const response = await importDocx(proverbsFile, meaningsFile, englishMeaningsFile, setProgress);
       setResult(response);
       toast.success("Dataset imported successfully");
     } catch (error) {
@@ -51,10 +56,12 @@ export function ImportDatasetPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-950">Import Dataset</h1>
-        <p className="mt-2 text-sm text-slate-500">Upload paired Word documents with matching proverb and meaning rows.</p>
+        <p className="mt-2 text-sm text-slate-500">
+          Upload matching proverb, Myanmar meaning, and English meaning Word documents.
+        </p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <UploadBox
           label="Proverbs.docx"
           file={proverbsFile}
@@ -68,6 +75,13 @@ export function ImportDatasetPage() {
           onDrop={(event) => handleDrop(event, "meanings")}
           onChange={(file) => assignFile(file, "meanings")}
           onClear={() => setMeaningsFile(null)}
+        />
+        <UploadBox
+          label="EnglishMeanings.docx"
+          file={englishMeaningsFile}
+          onDrop={(event) => handleDrop(event, "englishMeanings")}
+          onChange={(file) => assignFile(file, "englishMeanings")}
+          onClear={() => setEnglishMeaningsFile(null)}
         />
       </div>
 
@@ -89,10 +103,28 @@ export function ImportDatasetPage() {
       {result ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-900">
           <p className="font-bold">Import complete</p>
-          <p className="mt-2">Inserted {result.inserted}, skipped {result.skipped}, collection {result.collection}.</p>
-          {result.warnings.length ? <p className="mt-2">{result.warnings.join(" ")}</p> : null}
+          <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <ResultStat label="Documents" value={result.documents_imported} />
+            <ResultStat label="Embeddings" value={result.embeddings_created} />
+            <ResultStat label="Metadata failed" value={result.failed} />
+            <ResultStat label="Seconds" value={result.processing_time_seconds} />
+          </dl>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+interface ResultStatProps {
+  label: string;
+  value: number;
+}
+
+function ResultStat({ label, value }: ResultStatProps) {
+  return (
+    <div className="rounded-lg bg-white/70 px-3 py-2">
+      <dt className="text-xs font-semibold uppercase text-emerald-700">{label}</dt>
+      <dd className="mt-1 text-lg font-bold text-emerald-950">{value}</dd>
     </div>
   );
 }
