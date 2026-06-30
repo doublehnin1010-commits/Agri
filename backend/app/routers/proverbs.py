@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.deps import require_admin
 from app.models.proverb import ProverbCreate, ProverbResponse, ProverbUpdate
-from app.services.rag import add_proverb, list_proverbs, update_proverb
+from app.services.rag import add_proverb, delete_all_proverbs, delete_proverb, list_proverbs, update_proverb
 
 
 router = APIRouter()
@@ -35,3 +35,18 @@ async def update_proverb_route(proverb_id: str, payload: ProverbUpdate, _admin=D
         raise HTTPException(status_code=404, detail=str(e))
 
     return ProverbResponse(**proverb)
+
+
+@router.delete("/proverbs/{proverb_id}")
+async def delete_proverb_route(proverb_id: str, _admin=Depends(require_admin)):
+    deleted = delete_proverb(proverb_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Proverb not found")
+
+    return {"success": True, "deleted": 1}
+
+
+@router.delete("/proverbs")
+async def delete_all_proverbs_route(_admin=Depends(require_admin)):
+    deleted = delete_all_proverbs()
+    return {"success": True, "deleted": deleted}

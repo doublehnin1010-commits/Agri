@@ -26,19 +26,31 @@ class Settings(BaseSettings):
     ollama_timeout_seconds: int = 120
     ollama_temperature: float = 0.0
 
+    gemini_api_keys: str = ""
+    gemini_model: str = "gemini-2.0-flash"
+    gemini_timeout_seconds: int = 120
+    gemini_temperature: float = 0.0
+
     chroma_persist_dir: str = "./chroma_data"
     chroma_collection_name: str = "proverbs"
 
     rag_top_k: int = 5
-    rag_min_relevance_score: float = 0.75  # Guardrail: Minimum relevance threshold for retrieved proverbs
+    rag_min_relevance_score: float = 0.5  # Guardrail: Minimum relevance threshold for retrieved proverbs
     rag_min_lexical_similarity: float = 0.5
     rag_semantic_threshold: float = 0.5  # Semantic similarity threshold (0-1, higher=stricter matching)
+
+    whisper_model: str = "base"
+    whisper_device: str = "cpu"
+    whisper_compute_type: str = "int8"
 
     # If set, this email is assigned admin role on register.
     admin_email: str = ""
 
     def allowed_origins_list(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+
+    def gemini_api_keys_list(self) -> list[str]:
+        return [key.strip() for key in self.gemini_api_keys.split(",") if key.strip()]
 
 
 settings = Settings()

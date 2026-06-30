@@ -18,7 +18,7 @@ export function AppLayout() {
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur">
+        <header className="sticky top-0 z-20 flex  h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4  py-5 backdrop-blur">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}

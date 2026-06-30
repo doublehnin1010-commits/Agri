@@ -3,85 +3,110 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import unicodedata
 from typing import Any
 
 from app.core.config import settings
 from app.db.chroma import get_collection
-from app.services.ollama import generate_answer, safe_json_from_llm
+from app.services.llm import generate_answer, safe_json_from_llm
 from app.services.guardrails import (
     validate_question,
     create_guardrailed_answer,
     create_no_result_answer,
     is_answer_valid,
+    is_context_relevant,
 )
 
+INTENT_CLASSIFIER_SYSTEM_INSTRUCTION = """
+You classify intent for Myanmar Proverbs AI Tutor.
 
-PROVERB_KEYWORD_STOPWORDS = {
-    "စကား",
-    "စကားပုံ",
+Return JSON only. Do not answer the user.
+Use semantic understanding instead of exact phrase matching.
+
+Valid intents:
+
+- greeting:
+  The user greets the assistant.
+  Examples:
+  "မင်္ဂလာပါ"
+  "Hello"
+  "Hi"
+
+- role:
+  The user asks who the assistant is, what the system does, or what it can help with.
+  Examples:
+  "မင်းဘယ်သူလဲ"
+  "What can you do?"
+  "ဒီ system ကဘာလဲ"
+
+- proverb_question:
+  The user asks for a proverb, the meaning of a proverb, an explanation, or a proverb related to a situation, feeling, topic, or event.
+  Examples:
+  "ငါးနဲ့ပတ်သက်တဲ့ စကားပုံ"
+  "ဦးလှကို လူတွေက ကဲ့ရဲ့နေကြတယ်"
+  "ဒီအခြေအနေနဲ့ လိုက်ဖက်တဲ့ စကားပုံရှိလား"
+  "ချီးမွမ်း ခုနှစ်ရက် ကဲ့ရဲ့ ခုနှစ်ရက် ဆိုတာဘာလဲ"
+
+- proverb_only:
+  The user wants only the proverb without any explanation.
+  Examples:
+  "စကားပုံပဲပြော"
+  "Only proverb"
+  "Which proverb fits?"
+
+- translate_previous_to_myanmar:
+  The user asks to translate or explain the previous answer in Myanmar/Burmese.
+  Examples:
+  "မြန်မာလိုပြန်ရှင်းပေး"
+  "Translate to Burmese"
+
+- translate_previous_to_english:
+  The user asks to translate or explain the previous answer in English.
+  Examples:
+  "Explain in English"
+  "Translate to English"
+
+- thanks:
+  The user expresses gratitude.
+  Examples:
+  "ကျေးဇူးတင်ပါတယ်"
+  "Thanks"
+  "Thank you"
+
+- goodbye:
+  The user ends the conversation.
+  Examples:
+  "Bye"
+  "Goodbye"
+  "နောက်မှတွေ့မယ်"
+
+- unrelated:
+  The user's request is not related to Myanmar proverbs.
+  Examples:
+  "Write Python code"
+  "What is cloud computing?"
+  "Solve this math problem"
+
+Valid languages:
+
+- my:
+  The response should be in Myanmar/Burmese.
+
+- en:
+  The response should be in English.
+
+Output format:
+
+{
+    "intent": "<intent>",
+    "language": "<my|en>"
 }
 
-PROVERB_ONLY_PATTERNS = (
-    "ဘယ်လိုစကားပုံ",
-    "ဘာစကားပုံ",
-    "စကားပုံက ဘာ",
-    "စကားပုံဘာ",
-    "proverb only",
-)
+Only return valid JSON.
+Do not include markdown.
+Do not answer the user's question.
+""".strip()
 
-ROLE_QUESTION_PATTERNS = (
-    "မင်းကဘယ်သူလဲ",
-    "မင်းက ဘယ်သူလဲ",
-    "နင်ကဘယ်သူလဲ",
-    "နင်က ဘယ်သူလဲ",
-    "သင်ကဘယ်သူလဲ",
-    "သင်က ဘယ်သူလဲ",
-    "ဘယ်သူလဲ",
-    "ဒီsystem ကဘာအလုပ်လုပ်သလဲ",
-    "ဒီ system ကဘာအလုပ်လုပ်သလဲ",
-    "ဒီစနစ်ကဘာအလုပ်လုပ်သလဲ",
-    "ဘာအလုပ်လုပ်သလဲ",
-    "who are you",
-    "what are you",
-    "your role",
-    "what is this system",
-    "what does this system do",
-)
-
-TRANSLATE_TO_MYANMAR_PATTERNS = (
-    "မြန်မာလို",
-    "မြန်မာဘာသာ",
-    "myanmar လို",
-    "in myanmar",
-    "translate to myanmar",
-    "explain in myanmar",
-    "ပြန်ရှင်းပြ",
-    "မြန်မာလိုရှင်းပြ",
-    "မြန်မာလို ပြန်ရှင်းပြ",
-)
-
-TEACHER_STYLE_PREFIXES = (
-    "ကလေးတို့ရေ",
-    "ဆိုလိုတာက",
-    "လွယ်လွယ်ပြောရရင်",
-)
-
-MYANMAR_SYNONYM_GROUPS = (
-    ("တော်", "ထူးချွန်", "အစွမ်းထက်", "ထက်မြက်", "ပညာအရည်အသွေး", "ကျွမ်းကျင်"),
-    ("ကဲ့ရဲ့", "အပြစ်တင်", "အပြင်တင်", "ဝေဖန်", "မကောင်းပြော", "အတင်းပြော"),
-    ("ချီးမွမ်း", "ချီးမွန်း", "ချီးကျူး", "ကောင်းချီးပေး"),
-    ("ဆရာ", "ဆရာ့", "သင်ပေးသူ", "လက်ဦးဆရာ"),
-    ("တပည့်", "တပည့်", "ကျောင်းသား", "သင်ယူသူ"),
-    ("ကုသိုလ်", "ကောင်းမှု", "လှူဒါန်း", "အကျိုးပြု"),
-    ("ဝမ်း", "စားဝတ်နေရေး", "ဝမ်းရေး", "စားရေး"),
-)
-
-MYANMAR_NORMALIZATION_REPLACEMENTS = (
-    ("ဉ", "ဥ"),
-    ("ဿ", "သ"),
-    ("၏", "ရဲ့"),
-    ("၍", "ပြီး"),
-)
 
 
 def _row_id(keyword: str | None, proverb: str) -> str:
@@ -112,20 +137,185 @@ def _language_from_question(question: str) -> str:
     return "en"
 
 
-def _asks_for_translation_to_myanmar(question: str) -> bool:
-    normalized_question = _normalize_search_text(question)
-    compact_question = _compact_search_text(normalized_question)
+def _classify_user_intent(question: str) -> dict[str, Any]:
+    fallback = {
+        "intent": "proverb_question",
+        "language": _language_from_question(question),
+    }
+    if not question or not question.strip():
+        return fallback
 
-    for pattern in TRANSLATE_TO_MYANMAR_PATTERNS:
-        normalized_pattern = _normalize_search_text(pattern)
-        if normalized_pattern in normalized_question:
-            return True
-        if _compact_search_text(normalized_pattern) in compact_question:
-            return True
+    builtin_intent = _infer_builtin_intent(question)
+    if builtin_intent:
+        return {
+            "intent": builtin_intent,
+            "language": fallback["language"],
+        }
 
-    return False
+    prompt = f"""
+Classify this user message for Myanmar Proverbs AI Tutor.
+
+User message:
+{question}
+
+Return JSON exactly in this shape:
+{{
+  "intent": "role | translate_previous_to_myanmar | proverb_only | proverb_question",
+  "language": "my | en"
+}}
+"""
+    try:
+        result = safe_json_from_llm(
+            generate_answer(prompt, system_instruction=INTENT_CLASSIFIER_SYSTEM_INSTRUCTION)
+        )
+    except Exception:
+        return fallback
+
+    intent = result.get("intent")
+    language = result.get("language")
+    if intent not in {"role", "translate_previous_to_myanmar", "proverb_only", "proverb_question"}:
+        intent = fallback["intent"]
+    if language not in {"my", "en"}:
+        language = fallback["language"]
+
+    return {"intent": intent, "language": language}
 
 
+def _infer_builtin_intent(question: str) -> str | None:
+    normalized = _normalize_search_text(question)
+    compact = _compact_search_text(normalized)
+    plain_compact = re.sub(r"\s+", "", unicodedata.normalize("NFC", normalized))
+
+    # ==========================
+    # Greeting
+    # ==========================
+    if re.search(r"\b(hi|hello|hey|good morning|good afternoon|good evening)\b", normalized):
+        return "greeting"
+
+    if any(
+        text in plain_compact
+        for text in [
+            "မင်္ဂလာပါ",
+            "ဟယ်လို",
+            "ဟိုင်း",
+        ]
+    ):
+        return "greeting"
+
+    # ==========================
+    # Role
+    # ==========================
+    if re.search(r"\b(who|what)\s+(are|r)\s+(you|u)\b", normalized):
+        return "role"
+
+    if re.search(
+        r"\b(your|ur)\s+(role|job|purpose|name|capabilit(?:y|ies))\b",
+        normalized,
+    ):
+        return "role"
+
+    if re.search(
+        r"\bwhat\s+(is|does)\s+(this\s+)?(system|app|application)\b",
+        normalized,
+    ):
+        return "role"
+
+    if re.search(r"\bhow\s+can\s+(you|u)\s+help\b", normalized):
+        return "role"
+
+    if any(
+        text in plain_compact
+        for text in [
+            "မင်းဘယ်သူလဲ",
+            "ဘယ်သူလဲ",
+            "ဘာအလုပ်",
+            "ဘာလုပ်နိုင်လဲ",
+            "ဒီစနစ်ကဘာလဲ",
+            "ဒီappကဘာလဲ",
+            "ဒီapplicationကဘာလဲ",
+        ]
+    ):
+        return "role"
+
+    # ==========================
+    # Translate to Myanmar
+    # ==========================
+    if re.search(
+        r"\btranslate\b.*\b(burmese|myanmar)\b",
+        normalized,
+    ):
+        return "translate_previous_to_myanmar"
+
+    if any(
+        text in plain_compact
+        for text in [
+            "မြန်မာလို",
+            "မြန်မာလိုပြန်",
+            "ဗမာလို",
+            "ဗမာလိုပြန်",
+        ]
+    ):
+        return "translate_previous_to_myanmar"
+
+    # ==========================
+    # Translate to English
+    # ==========================
+    if re.search(
+        r"\btranslate\b.*\benglish\b",
+        normalized,
+    ):
+        return "translate_previous_to_english"
+
+    if any(
+        text in normalized
+        for text in [
+            "english",
+            "in english",
+            "explain in english",
+        ]
+    ):
+        return "translate_previous_to_english"
+
+    # ==========================
+    # Thanks
+    # ==========================
+    if re.search(
+        r"\b(thanks|thank you|thx|ty)\b",
+        normalized,
+    ):
+        return "thanks"
+
+    if any(
+        text in plain_compact
+        for text in [
+            "ကျေးဇူး",
+            "ကျေးဇူးတင်ပါတယ်",
+            "ကျေးဇူးပါ",
+        ]
+    ):
+        return "thanks"
+
+    # ==========================
+    # Goodbye
+    # ==========================
+    if re.search(
+        r"\b(bye|goodbye|see you|see ya)\b",
+        normalized,
+    ):
+        return "goodbye"
+
+    if any(
+        text in plain_compact
+        for text in [
+            "နောက်မှတွေ့မယ်",
+            "သွားပြီ",
+            "တာ့တာ",
+            "ဘိုင်",
+        ]
+    ):
+        return "goodbye"
+
+    return None
 def _no_result_answer(language: str) -> dict[str, Any]:
     if language == "en":
         return {
@@ -148,17 +338,21 @@ def _teacher_style_meaning(source: dict[str, Any], language: str = "my") -> str 
     if language == "en":
         if "teacher" in proverb.lower() and "student" in proverb.lower():
             return "A student can become more skilled or successful than the teacher."
-        return f"In simple words, this proverb means: {meaning}"
+        return f" {meaning}"
 
     if "ဆရာ့ထက်" in proverb and "တပည့်" in proverb:
         return "ကလေးတို့ရေ၊ တပည့်က ကြိုးစားလို့ ဆရာထက် ပိုတော်လာတဲ့အခါ ဒီစကားပုံကို သုံးတာပါ။"
 
-    return f"ကလေးတို့ရေ၊ ဒီစကားပုံက {meaning} လို့ ဆိုလိုတာပါ။"
+    return f"ကလေးတို့ရေ၊ ဒီစကားပုံက {meaning} "
 
 
-def _looks_teacher_styled(meaning: str | None) -> bool:
+def _looks_teacher_styled(meaning: str | None, language: str) -> bool:
     normalized_meaning = (meaning or "").strip()
-    return any(normalized_meaning.startswith(prefix) for prefix in TEACHER_STYLE_PREFIXES)
+    if not normalized_meaning:
+        return False
+    if language == "en":
+        return normalized_meaning.startswith(("In simple words", "This proverb means"))
+    return bool(re.match(r"^(ကလေးတို့ရေ|ဆိုလိုတာက|လွယ်လွယ်ပြောရရင်)", normalized_meaning))
 
 
 def _role_answer(language: str) -> dict[str, Any]:
@@ -166,7 +360,9 @@ def _role_answer(language: str) -> dict[str, Any]:
         return {
             "proverb": None,
             "meaning_simple_mm": (
-                "I’m Myanmar Proverbs AI Tutor. I find proverbs from the dataset and explain them in a simple, friendly way."
+               f"I’m {settings.app_name}. I find Myanmar proverbs from the dataset and explain them in a simple, friendly way.\n"
+f"မြန်မာလိုပြောရရင် ကျွန်ုပ်က {settings.app_name} ဖြစ်ပါတယ်။ "
+f"မြန်မာစကားပုံအချက်အလက်စုစုဆောင်းမှု (Dataset) ထဲကနေ ရှာဖွေပေးပြီး၊ အဓိပ္ပာယ်ကို လွယ်ကူရှင်းလင်းစွာ ရှင်းပြပေးသွားမှာ ဖြစ်ပါတယ်။"
             ),
             "example_mm": None,
             "sources": [],
@@ -175,11 +371,62 @@ def _role_answer(language: str) -> dict[str, Any]:
     return {
         "proverb": None,
         "meaning_simple_mm": (
-            "ကလေးတို့ရေ၊ ကျွန်ုပ်က မြန်မာစကားပုံတွေကို ရှာပေးပြီး "
-            "အဓိပ္ပါယ်ကို လွယ်လွယ်ကူကူ ရှင်းပြပေးတဲ့ Myanmar Proverbs AI Tutor ပါ။ "
-            "ဒီစနစ်က မေးခွန်းနဲ့ သက်ဆိုင်တဲ့ စကားပုံကို ဒေတာထဲကနေ ရှာပြီး "
-            "ဆရာတစ်ယောက်လို နားလည်လွယ်အောင် ပြန်ဖြေပေးတာပါ။"
+          f"ကျွန်ုပ်သည် {settings.app_name} ဖြစ်ပါသည်။ "
+"မြန်မာစကားပုံများကို အချက်အလက်စုစုဆောင်းမှု (Dataset) ထဲမှ ရှာဖွေပေးပြီး၊ အဓိပ္ပာယ်ကို လွယ်ကူရှင်းလင်းစွာ ရှင်းပြပေးသွားမည် ဖြစ်ပါသည်။ "
+"ဤစနစ်သည် မိမိမေးမြန်းသော မေးခွန်းနှင့် ကိုက်ညီသည့် စကားပုံကို ရှာဖွေကာ "
+"ကျွမ်းကျင်သူတစ်ဦးကဲ့သို့ နားလည်လွယ်အောင် ပြန်လည်ဖြေကြားပေးမည် ဖြစ်ပါသည်။"
         ),
+        "example_mm": None,
+        "sources": [],
+    }
+
+
+def _greeting_answer(language: str) -> dict[str, Any]:
+    if language == "en":
+        return {
+            "proverb": None,
+            "meaning_simple_mm": "Hello! I can help you find a Myanmar proverb and explain it in a simple way.",
+            "example_mm": None,
+            "sources": [],
+        }
+
+    return {
+        "proverb": None,
+     "meaning_simple_mm": "မင်္ဂလာပါ။ ကျွန်ုပ်သည် မြန်မာစကားပုံများကို ရှာဖွေပေးပြီး အဓိပ္ပာယ်ကို လွယ်ကူရှင်းလင်းစွာ ရှင်းပြပေးသွားမည် ဖြစ်ပါသည်။",
+        "example_mm": None,
+        "sources": [],
+    }
+
+
+def _thanks_answer(language: str) -> dict[str, Any]:
+    if language == "en":
+        return {
+            "proverb": None,
+            "meaning_simple_mm": "You’re welcome! I’m happy to help.",
+            "example_mm": None,
+            "sources": [],
+        }
+
+    return {
+        "proverb": None,
+    "meaning_simple_mm": "ရပါတယ်ခင်ဗျာ။ အကူအညီပေးခွင့်ရလို့ ဝမ်းသာပါတယ်။",
+        "example_mm": None,
+        "sources": [],
+    }
+
+
+def _goodbye_answer(language: str) -> dict[str, Any]:
+    if language == "en":
+        return {
+            "proverb": None,
+            "meaning_simple_mm": "Goodbye! Feel free to come back if you want help with Myanmar proverbs.",
+            "example_mm": None,
+            "sources": [],
+        }
+
+    return {
+        "proverb": None,
+        "meaning_simple_mm": "သွားလိုက်ပါဦးမယ်။ နောက်နောင်လည်း မြန်မာစကားပုံတွေအတွက် အကူအညီလိုရင် ပြန်လည်လာရောက်ဖို့ ဖိတ်ခေါ်ပါတယ်။",
         "example_mm": None,
         "sources": [],
     }
@@ -274,6 +521,28 @@ def update_proverb(proverb_id: str, updates: dict[str, Any]) -> dict[str, Any]:
 
     col.upsert(ids=[new_id], documents=[doc], metadatas=[metadata])
     return {"id": new_id, **normalized}
+
+
+def delete_proverb(proverb_id: str) -> bool:
+    col = get_collection()
+    existing = col.get(ids=[proverb_id], include=["metadatas"])
+    metadatas = existing.get("metadatas") or []
+    if not metadatas or not metadatas[0]:
+        return False
+
+    col.delete(ids=[proverb_id])
+    return True
+
+
+def delete_all_proverbs() -> int:
+    col = get_collection()
+    result = col.get(limit=100000, include=["metadatas"])
+    ids = result.get("ids") or []
+    if not ids:
+        return 0
+
+    col.delete(ids=ids)
+    return len(ids)
 
 
 def upsert_proverbs(rows: list[dict[str, Any]]) -> tuple[int, int]:
@@ -458,8 +727,6 @@ def _lexical_distance(normalized_query: str, metadata: dict[str, Any]) -> float 
         return 0.0
 
     proverb_keyword_score = _proverb_keyword_similarity(query_variants, metadata)
-    synonym_score = _synonym_similarity(normalized_query, searchable)
-
     searchable_compacts = [_compact_search_text(text) for text in searchable_variants]
     tokens = [
         token
@@ -481,7 +748,7 @@ def _lexical_distance(normalized_query: str, metadata: dict[str, Any]) -> float 
         for query in query_variants
         for searchable_text in searchable_variants
     )
-    best_similarity = max(proverb_keyword_score, synonym_score, token_score, ngram_score)
+    best_similarity = max(proverb_keyword_score, token_score, ngram_score)
 
     if best_similarity == 0.0:
         return None
@@ -520,7 +787,7 @@ def _proverb_keyword_similarity(query_variants: list[str], metadata: dict[str, A
     for variant in searchable_variants:
         for token in variant.split():
             compact_token = _compact_search_text(token)
-            if len(compact_token) >= 4 and compact_token not in PROVERB_KEYWORD_STOPWORDS:
+            if len(compact_token) >= 4:
                 tokens.append(token)
     tokens = list(dict.fromkeys(tokens))
     if not tokens:
@@ -559,10 +826,7 @@ def _normalize_search_text(text: str) -> str:
 
 
 def _apply_myanmar_normalization_replacements(text: str) -> str:
-    normalized = text
-    for source, target in MYANMAR_NORMALIZATION_REPLACEMENTS:
-        normalized = normalized.replace(source, target)
-    return normalized
+    return unicodedata.normalize("NFC", text)
 
 
 def _search_text_variants(text: str) -> list[str]:
@@ -574,59 +838,6 @@ def _search_text_variants(text: str) -> list[str]:
 def _strip_optional_myanmar_marks(text: str) -> str:
     # Keep medial marks because they can change word identity completely.
     return re.sub(r"[\u1037\u1038\u1039\u103a]", "", text)
-    return re.sub(r"[့း္်ျြွှ]", "", text)
-
-
-def _synonym_similarity(query: str, searchable: str) -> float:
-    query_groups = _matched_synonym_group_indexes(query)
-    if not query_groups:
-        return 0.0
-
-    searchable_groups = _matched_synonym_group_indexes(searchable)
-    matched = query_groups & searchable_groups
-    if not matched:
-        return 0.0
-
-    if len(query_groups) == 1:
-        return 0.35
-
-    if len(matched) < 2:
-        return 0.0
-
-    return min(0.75, len(matched) / len(query_groups))
-
-
-def _matched_synonym_group_indexes(text: str) -> set[int]:
-    matched_groups: set[int] = set()
-
-    for index, group in enumerate(MYANMAR_SYNONYM_GROUPS):
-        if any(_contains_synonym_term(text, term) for term in group):
-            matched_groups.add(index)
-
-    return matched_groups
-
-
-def _contains_synonym_term(text: str, term: str) -> bool:
-    normalized_text = _normalize_search_text(text)
-    normalized_term = _normalize_search_text(term)
-    if not normalized_text or not normalized_term:
-        return False
-
-    tokens = normalized_text.split()
-    if normalized_term in tokens:
-        return True
-
-    compact_term = _compact_synonym_text(normalized_term)
-    if len(compact_term) <= 3:
-        return any(_compact_synonym_text(token).startswith(compact_term) for token in tokens)
-
-    return compact_term in _compact_synonym_text(normalized_text)
-
-
-def _compact_synonym_text(text: str) -> str:
-    compact = _apply_myanmar_normalization_replacements(text)
-    compact = re.sub(r"[့း]+", "", compact)
-    return re.sub(r"\s+", "", compact)
 
 
 def _compact_search_text(text: str) -> str:
@@ -681,41 +892,15 @@ def _answer_from_best_source(sources: list[dict[str, Any]], language: str = "my"
     )
 
 
-def _asks_for_proverb_only(question: str) -> bool:
-    normalized_question = _normalize_search_text(question)
-    compact_question = _compact_search_text(normalized_question)
-
-    for pattern in PROVERB_ONLY_PATTERNS:
-        normalized_pattern = _normalize_search_text(pattern)
-        if normalized_pattern in normalized_question:
-            return True
-        if _compact_search_text(normalized_pattern) in compact_question:
-            return True
-
-    return False
-
-
-def _asks_about_role(question: str) -> bool:
-    normalized_question = _normalize_search_text(question)
-    compact_question = _compact_search_text(normalized_question)
-
-    for pattern in ROLE_QUESTION_PATTERNS:
-        normalized_pattern = _normalize_search_text(pattern)
-        if normalized_pattern in normalized_question:
-            return True
-        if _compact_search_text(normalized_pattern) in compact_question:
-            return True
-
-    return False
-
-
 def _build_answer_prompt(context_json: str, user_question: str, language: str) -> str:
     if language == "en":
         return f"""
 You are a Myanmar Proverbs AI Tutor.
 
-Use ONLY the context below.
-If there is no exact proverb match, choose the closest meaning.
+Use ONLY the retrieved dataset context below.
+Never use outside knowledge, general facts, programming, science, history, politics, or any topic outside Myanmar proverbs.
+Never guess or invent proverbs or meanings.
+If there is no exact proverb match, choose the closest meaning from the context only.
 Return the best matching proverb with a warm, natural English explanation.
 Explain like a kind teacher answering children.
 Do not copy the source meaning word-for-word.
@@ -741,8 +926,10 @@ Answer in English only, using JSON with these fields:
     return f"""
 You are a Myanmar Proverbs AI Tutor.
 
-Use ONLY the context below.
-If there is no exact proverb match, choose the closest meaning.
+Use ONLY the retrieved dataset context below.
+Never use outside knowledge, general facts, programming, science, history, politics, or any topic outside Myanmar proverbs.
+Never guess or invent proverbs or meanings.
+If there is no exact proverb match, choose the closest meaning from the context only.
 Return the best matching proverb with a warm, natural Burmese explanation.
 Explain like a kind teacher answering children.
 Do not copy the source meaning word-for-word.
@@ -767,17 +954,37 @@ Answer in Burmese only, using JSON with these fields:
 
 
 def rag_answer(user_question: str, previous_answer: dict[str, Any] | None = None) -> dict[str, Any]:
-    response_language = "my" if _asks_for_translation_to_myanmar(user_question) else _language_from_question(user_question)
+    user_intent = _classify_user_intent(user_question)
+    intent = user_intent["intent"]
+    response_language = (
+        "my"
+        if intent == "translate_previous_to_myanmar"
+        else "en"
+        if intent == "translate_previous_to_english"
+        else user_intent["language"]
+    )
 
     # Guardrail 1: Validate the question
     is_valid, _error_msg = validate_question(user_question)
     if not is_valid:
         return _no_result_answer(response_language)
 
-    if _asks_for_translation_to_myanmar(user_question) and previous_answer:
+    if intent == "translate_previous_to_myanmar" and previous_answer:
         return _translate_previous_answer(previous_answer, "my")
 
-    if _asks_about_role(user_question):
+    if intent == "translate_previous_to_english" and previous_answer:
+        return _translate_previous_answer(previous_answer, "en")
+
+    if intent == "greeting":
+        return _greeting_answer(response_language)
+
+    if intent == "thanks":
+        return _thanks_answer(response_language)
+
+    if intent == "goodbye":
+        return _goodbye_answer(response_language)
+
+    if intent == "role":
         return _role_answer(response_language)
 
     # Guardrail 2: Retrieve context
@@ -786,7 +993,10 @@ def rag_answer(user_question: str, previous_answer: dict[str, Any] | None = None
     if not sources:
         return _no_result_answer(response_language)
 
-    if _asks_for_proverb_only(user_question):
+    if not is_context_relevant(sources):
+        return _no_result_answer(response_language)
+
+    if intent == "proverb_only":
         best = sources[0]
         return {
             "proverb": best.get("proverb"),
@@ -815,7 +1025,7 @@ def rag_answer(user_question: str, previous_answer: dict[str, Any] | None = None
         answer["meaning_simple_mm"] = _teacher_style_meaning(best, response_language)
     elif response_language == "en" and not answer_meaning.startswith("In simple words"):
         answer["meaning_simple_mm"] = _teacher_style_meaning(best, response_language)
-    elif response_language == "my" and not _looks_teacher_styled(answer_meaning):
+    elif response_language == "my" and not _looks_teacher_styled(answer_meaning, response_language):
         answer["meaning_simple_mm"] = _teacher_style_meaning(best, response_language)
 
     if "sources" not in answer or not answer["sources"]:

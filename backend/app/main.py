@@ -5,8 +5,8 @@ from app.core.config import settings
 from app.db.chroma import connect_chroma
 from app.db.mongodb import close_mongodb, connect_mongodb
 from app.middleware.rbac import RBACMiddleware
-from app.routers import auth, chat, history, import_excel, proverbs, reindex
-from app.services.ollama import configure_ollama
+from app.routers import auth, chat, history, import_excel, proverbs, reindex, transcribe
+from app.services.llm import configure_llm
 
 
 app = FastAPI(title=settings.app_name)
@@ -24,6 +24,7 @@ app.include_router(auth.router, prefix=settings.api_v1_prefix, tags=["auth"])
 app.include_router(import_excel.router, prefix=settings.api_v1_prefix, tags=["dataset"])
 app.include_router(proverbs.router, prefix=settings.api_v1_prefix, tags=["proverbs"])
 app.include_router(chat.router, prefix=settings.api_v1_prefix, tags=["chat"])
+app.include_router(transcribe.router, prefix=settings.api_v1_prefix, tags=["voice"])
 app.include_router(history.router, prefix=settings.api_v1_prefix, tags=["history"])
 app.include_router(reindex.router, prefix=settings.api_v1_prefix, tags=["dataset"])
 
@@ -32,7 +33,7 @@ app.include_router(reindex.router, prefix=settings.api_v1_prefix, tags=["dataset
 async def on_startup():
     connect_mongodb()
     connect_chroma()
-    configure_ollama()
+    configure_llm()
 
 
     # Ensure chroma is connected and available for reindex endpoint

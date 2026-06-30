@@ -75,8 +75,9 @@ export interface Proverb {
 }
 
 export interface ImportResult {
-  inserted: number;
-  skipped: number;
-  warnings: string[];
-  collection: string;
+  success: boolean;
+  documents_imported: number;
+  embeddings_created: number;
+  failed: number;
+  processing_time_seconds: number;
 }

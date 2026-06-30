@@ -21,7 +21,7 @@ def is_context_relevant(
     Args:
         context: List of retrieved proverbs with scores
         min_relevance_score: Minimum relevance threshold for semantic similarity (higher = more relevant)
-                           If None, uses settings.rag_min_relevance_score (which is 0.75)
+                           If None, uses the configured RAG retrieval thresholds.
     
     Returns:
         True if context contains at least one relevant proverb, False otherwise
@@ -29,22 +29,30 @@ def is_context_relevant(
     if not context:
         return False
 
-    threshold = min_relevance_score or settings.rag_min_relevance_score
+    semantic_threshold = (
+        min_relevance_score
+        if min_relevance_score is not None
+        else settings.rag_semantic_threshold
+    )
+    lexical_threshold = (
+        min_relevance_score
+        if min_relevance_score is not None
+        else settings.rag_min_lexical_similarity
+    )
 
-    # Check if any proverb has a score above the relevance threshold
+    # Check if any proverb has a score accepted by the retrieval layer.
     # For semantic search: similarity score (higher is better, range 0-1)
     # For lexical search: distance score (lower is better, range 0-1)
     for item in context:
         # Try semantic similarity first (new approach)
         similarity = item.get("similarity")
         if similarity is not None:
-            # Threshold 0.75 means at least 75% semantically similar
-            if similarity >= threshold:
+            if similarity >= semantic_threshold:
                 return True
         
         # Fall back to distance score (old approach)
         score = item.get("score")
-        if score is not None and score <= (1.0 - threshold):
+        if score is not None and score <= (1.0 - lexical_threshold):
             return True
 
     return False

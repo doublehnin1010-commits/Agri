@@ -18,11 +18,11 @@ export function AdminDashboardPage() {
             Manage dataset imports, proverb records, and learning activity from one workspace.
           </p>
         </div>
-        <Link to="/dashboard" className="btn-secondary">Open Tutor</Link>
+       
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Backend history" value={data.length} icon={History} />
+        <StatCard label="Total users" value={data.length} icon={History} />
         <StatCard label="Local sessions" value={localCount} icon={MessageSquareText} />
         <StatCard label="Dataset tools" value="DOCX" icon={DatabaseZap} />
         <StatCard label="Proverb CRUD" value="Ready" icon={LibraryBig} />
@@ -32,7 +32,9 @@ export function AdminDashboardPage() {
         <Link to="/admin/import" className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm transition hover:border-brand-200 hover:shadow-soft">
           <DatabaseZap className="h-6 w-6 text-brand-700" aria-hidden="true" />
           <h2 className="mt-4 text-lg font-bold text-slate-950">Import Dataset</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-500">Upload matching Proverbs.docx and Meanings.docx files into the RAG collection.</p>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            Upload matching Proverbs.docx, Meanings.docx, and EnglishMeanings.docx files into the RAG collection.
+          </p>
         </Link>
         <Link to="/admin/proverbs" className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm transition hover:border-brand-200 hover:shadow-soft">
           <LibraryBig className="h-6 w-6 text-brand-700" aria-hidden="true" />

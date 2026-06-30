@@ -34,3 +34,13 @@ export async function updateProverb(id: string, payload: ProverbPayload): Promis
   const { data } = await apiClient.put<Proverb>(`/proverbs/${id}`, payload);
   return data;
 }
+
+export async function deleteProverb(id: string): Promise<{ success: boolean; deleted: number }> {
+  const { data } = await apiClient.delete<{ success: boolean; deleted: number }>(`/proverbs/${id}`);
+  return data;
+}
+
+export async function deleteAllProverbs(): Promise<{ success: boolean; deleted: number }> {
+  const { data } = await apiClient.delete<{ success: boolean; deleted: number }>("/proverbs");
+  return data;
+}
