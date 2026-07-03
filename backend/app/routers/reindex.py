@@ -30,13 +30,14 @@ async def reindex(req: ReindexRequest):
 
 @router.delete("/delete/file")
 async def delete_dataset():
-    from app.db.chroma import delete_chroma_store
+    from app.db.chroma import delete_chroma_store, reset_chroma_collection
 
+    reset_chroma_collection()
     deleted = delete_chroma_store()
     if not deleted:
-        return {"ok": True, "deleted": False, "message": "No dataset files were present."}
+        return {"ok": True, "deleted": False, "message": "Chroma collection reset."}
 
-    return {"ok": True, "deleted": True, "message": "Chroma dataset files deleted."}
+    return {"ok": True, "deleted": True, "message": "Chroma dataset files deleted and collection reset."}
 
 
 @router.post("/reindex/upload")

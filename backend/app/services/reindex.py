@@ -6,7 +6,7 @@ from typing import Any, BinaryIO, List
 
 from docx import Document
 
-from app.db.chroma import get_collection
+from app.db.chroma import reset_chroma_collection
 from app.services.rag import upsert_proverbs
 
 
@@ -88,12 +88,9 @@ def merge_proverbs_meanings_from_uploads(
     return rows
 
 
-def _clear_collection(col: Any) -> None:
-    """Remove all records from the Chroma collection by deleting all IDs."""
-    result = col.get(limit=100000, include=["metadatas"])
-    ids = result.get("ids") or []
-    if ids:
-        col.delete(ids=ids)
+def _clear_collection() -> None:
+    """Reset the Chroma collection so embedding dimensions can change safely."""
+    reset_chroma_collection()
 
 
 def reindex_from_word_files(proverbs_path: str, meanings_path: str, clear_existing: bool = True) -> dict[str, Any]:
@@ -101,8 +98,6 @@ def reindex_from_word_files(proverbs_path: str, meanings_path: str, clear_existi
 
     Returns dict with inserted and skipped counts and warnings.
     """
-    col = get_collection()
-
     rows = merge_proverbs_meanings(proverbs_path, meanings_path)
 
     warnings: list[str] = []
@@ -113,7 +108,7 @@ def reindex_from_word_files(proverbs_path: str, meanings_path: str, clear_existi
 
     if clear_existing:
         try:
-            _clear_collection(col)
+            _clear_collection()
         except Exception as e:
             logger.exception("Failed to clear existing ChromaDB collection: %s", e)
             warnings.append(f"Failed to clear existing collection: {e}")
@@ -127,8 +122,6 @@ def reindex_from_word_uploads(
     proverbs_file: Any, meanings_file: Any, clear_existing: bool = True
 ) -> dict[str, Any]:
     """Rebuild the ChromaDB collection from uploaded .docx files."""
-    col = get_collection()
-
     rows = merge_proverbs_meanings_from_uploads(proverbs_file, meanings_file)
 
     warnings: list[str] = []
@@ -139,7 +132,7 @@ def reindex_from_word_uploads(
 
     if clear_existing:
         try:
-            _clear_collection(col)
+            _clear_collection()
         except Exception as e:
             logger.exception("Failed to clear existing ChromaDB collection: %s", e)
             warnings.append(f"Failed to clear existing collection: {e}")

@@ -81,3 +81,23 @@ export interface ImportResult {
   failed: number;
   processing_time_seconds: number;
 }
+
+export interface ImportJobUploadResponse {
+  job_id: string;
+  status: string;
+  message: string;
+}
+
+export interface ImportJobProgress {
+  job_id: string;
+  status: "uploaded" | "processing" | "embedding" | "completed" | "failed";
+  current?: number;
+  total?: number;
+  progress?: number;
+  step?: string;
+  failed?: number;
+  estimated_remaining?: number;
+  documents?: number;
+  processing_time_seconds?: number;
+  error?: string;
+}

@@ -20,26 +20,35 @@ PROJECT_ROOT = BACKEND_DIR.parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.services.gemini import generate_gemini_text, validate_gemini_config  # noqa: E402
+from app.services.llm import configure_llm, generate_utility_response  # noqa: E402
 
 
 ALLOWED_CATEGORIES = {
     "Social",
-    "Education",
     "Family",
+    "Education",
     "Friendship",
-    "Success",
-    "Failure",
     "Leadership",
     "Honesty",
     "Wisdom",
     "Patience",
+    "Success",
+    "Failure",
     "Money",
-    "Time",
+    "Business",
     "Work",
-    "Kindness",
     "Responsibility",
     "Morality",
+    "Discipline",
+    "Knowledge",
+    "Experience",
+    "Communication",
+    "Decision Making",
+    "Human Nature",
+    "Relationships",
+    "Respect",
+    "Self Improvement",
+    "Perseverance",
     "General",
 }
 DEFAULT_BATCH_SIZE = 10
@@ -108,7 +117,7 @@ def chunked(items: list[ProverbMeaningPair], batch_size: int) -> list[list[Prove
 
 
 def build_prompt(batch: list[ProverbMeaningPair]) -> str:
-    """Build a batch prompt that asks Gemini to return a JSON array."""
+    """Build a batch prompt that asks the LLM to return a JSON array."""
 
     rows = [
         {
@@ -164,16 +173,16 @@ Input rows:
 
 
 def extract_json_array(text: str) -> list[Any]:
-    """Parse a JSON array from Gemini text, including fenced-code responses."""
+    """Parse a JSON array from LLM text, including fenced-code responses."""
 
     cleaned = re.sub(r"```(?:json)?|```", "", text.strip(), flags=re.IGNORECASE)
     start = cleaned.find("[")
     end = cleaned.rfind("]")
     if start == -1 or end == -1 or end <= start:
-        raise ValueError("Gemini response did not contain a JSON array.")
+        raise ValueError("LLM response did not contain a JSON array.")
     parsed = json.loads(cleaned[start : end + 1])
     if not isinstance(parsed, list):
-        raise ValueError("Gemini response JSON was not an array.")
+        raise ValueError("LLM response JSON was not an array.")
     return parsed
 
 
@@ -217,24 +226,24 @@ def sanitize_metadata(raw: Any, expected_row_number: int) -> MetadataRecord:
 
 
 def fallback_metadata() -> MetadataRecord:
-    """Return metadata defaults used after repeated Gemini failure."""
+    """Return metadata defaults used after repeated LLM failure."""
 
     return MetadataRecord(category="General", keywords=[], english_translation="")
 
 
 def generate_batch_metadata(batch: list[ProverbMeaningPair]) -> list[MetadataRecord]:
-    """Generate metadata for one batch, retrying failed Gemini calls up to three times."""
+    """Generate metadata for one batch, retrying failed LLM calls up to three times."""
 
     prompt = build_prompt(batch)
     last_error: Exception | None = None
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            raw_text = generate_gemini_text(prompt)
+            raw_text = generate_utility_response(prompt)
             parsed = extract_json_array(raw_text)
             if len(parsed) != len(batch):
                 raise ValueError(
-                    f"Gemini returned {len(parsed)} records for {len(batch)} input rows."
+                    f"LLM returned {len(parsed)} records for {len(batch)} input rows."
                 )
 
             records = [
@@ -308,7 +317,7 @@ def generate_metadata_dataset(
 ) -> None:
     """Run the full DOCX-to-XLSX metadata generation workflow."""
 
-    validate_gemini_config()
+    configure_llm()
 
     print("Reading Proverbs.docx...")
     proverbs = read_docx_paragraphs(proverbs_path)
@@ -340,7 +349,7 @@ def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for the metadata generator."""
 
     parser = argparse.ArgumentParser(
-        description="Generate Gemini metadata for Myanmar proverb DOCX datasets."
+        description="Generate LLM metadata for Myanmar proverb DOCX datasets."
     )
     parser.add_argument(
         "--proverbs",
@@ -364,7 +373,7 @@ def parse_args() -> argparse.Namespace:
         "--batch-size",
         type=int,
         default=DEFAULT_BATCH_SIZE,
-        help="Number of proverb-meaning pairs per Gemini request.",
+        help="Number of proverb-meaning pairs per LLM request.",
     )
     return parser.parse_args()
 

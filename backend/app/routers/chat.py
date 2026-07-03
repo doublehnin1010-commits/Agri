@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from app.db.mongodb import get_db
 from app.models.chat import ChatRequest, ChatResponse
 from app.core.deps import get_current_user_id
-from app.services.rag import rag_answer
+from app.services.rag import arag_answer
 
 
 router = APIRouter()
@@ -59,7 +59,7 @@ async def chat(payload: ChatRequest, user_id: str = Depends(get_current_user_id)
         if previous_answer is None:
             previous_answer = conversation.get("assistant_message")
 
-    answer = rag_answer(payload.message, previous_answer=previous_answer)
+    answer = await arag_answer(payload.message, previous_answer=previous_answer)
 
     user_message = _message("user", payload.message, now)
     assistant_message = _message("assistant", "", now, answer)
