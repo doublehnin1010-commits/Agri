@@ -9,7 +9,7 @@ import json
 import chromadb
 from chromadb.utils import embedding_functions
 from app.core.config import settings
-from app.services.llm import generate_answer
+from app.services.llm import generate_utility_response
 from typing import Any
 
 def get_collection():
@@ -42,7 +42,7 @@ Return ONLY a comma-separated list of Burmese keywords. Example: "အခေါ�
 Keywords:"""
 
     try:
-        result = generate_answer(prompt)
+        result = generate_utility_response(prompt)
         # Clean up the response
         keywords = result.strip()
         if "Keywords:" in keywords:

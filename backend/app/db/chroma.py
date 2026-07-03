@@ -5,18 +5,16 @@ import time
 from pathlib import Path
 from typing import Any
 
-import chromadb
-from chromadb.utils import embedding_functions
+from langchain_chroma import Chroma
 
 from app.core.config import BACKEND_DIR, settings
 
 
-class Chroma:
-    client: Any | None = None
-    collection: Any | None = None
+class ChromaStore:
+    vectorstore: Chroma | None = None
 
 
-chroma = Chroma()
+chroma_store = ChromaStore()
 
 
 def _resolve_chroma_path(path: str) -> str:
@@ -27,36 +25,63 @@ def _resolve_chroma_path(path: str) -> str:
 
 
 def connect_chroma() -> None:
-    chroma.client = chromadb.PersistentClient(path=_resolve_chroma_path(settings.chroma_persist_dir))
-    embedding_fn = embedding_functions.DefaultEmbeddingFunction()
-    chroma.collection = chroma.client.get_or_create_collection(
-        name=settings.chroma_collection_name,
-        metadata={"hnsw:space": "cosine"},
-        embedding_function=embedding_fn,
+    """Initialize the LangChain Chroma vector store with OllamaEmbeddings."""
+
+    from app.services.embedding_service import get_embeddings
+
+    chroma_store.vectorstore = Chroma(
+        collection_name=settings.chroma_collection_name,
+        embedding_function=get_embeddings(),
+        persist_directory=_resolve_chroma_path(settings.chroma_persist_dir),
+        collection_metadata={"hnsw:space": "cosine"},
     )
 
 
-def get_collection():
-    if not chroma.collection:
+def get_vectorstore() -> Chroma:
+    if chroma_store.vectorstore is None:
         connect_chroma()
-    return chroma.collection
+    return chroma_store.vectorstore
+
+
+def get_collection() -> Any:
+    """Backward-compatible access to the underlying ChromaDB collection."""
+
+    return get_vectorstore()._collection
+
+
+def reset_chroma_collection() -> None:
+    """Drop and recreate the Chroma collection.
+
+    This is required when changing embedding models because Chroma fixes a
+    collection's vector dimension after the first inserted embedding.
+    """
+
+    try:
+        get_vectorstore().delete_collection()
+    except Exception:
+        pass
+
+    chroma_store.vectorstore = None
+    try:
+        from app.services.retriever_service import invalidate_metadata_cache
+
+        invalidate_metadata_cache()
+    except Exception:
+        pass
+
+    connect_chroma()
 
 
 def delete_chroma_store() -> bool:
     """Delete the persistent Chroma dataset storage."""
-    # Reset the Chroma client and collection to release any open handles.
-    if chroma.client is not None:
-        try:
-            chroma.client.reset()
-        except Exception:
-            pass
-        try:
-            chroma.client.close()
-        except Exception:
-            pass
 
-    chroma.collection = None
-    chroma.client = None
+    chroma_store.vectorstore = None
+    try:
+        from app.services.retriever_service import invalidate_metadata_cache
+
+        invalidate_metadata_cache()
+    except Exception:
+        pass
 
     persist_path = Path(_resolve_chroma_path(settings.chroma_persist_dir))
     if not persist_path.exists():

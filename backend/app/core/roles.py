@@ -13,6 +13,7 @@ ADMIN_ONLY_PATHS: set[tuple[str, str]] = {
 }
 
 ADMIN_ONLY_PREFIXES: list[tuple[str, str]] = [
+    ("GET", "/import-docx/status/"),
     ("PUT", "/proverbs/"),
     ("DELETE", "/proverbs/"),
 ]

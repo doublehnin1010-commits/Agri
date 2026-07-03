@@ -295,16 +295,6 @@ function ProverbForm({ proverb, isSubmitting, onSubmit }: ProverbFormProps) {
         <label className="form-label" htmlFor="meaning">Meaning</label>
         <textarea id="meaning" rows={5} className="form-input" {...register("meaning")} />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <label className="form-label" htmlFor="keyword">Keyword</label>
-          <input id="keyword" className="form-input" {...register("keyword")} />
-        </div>
-        <div className="space-y-2">
-          <label className="form-label" htmlFor="example">Example</label>
-          <input id="example" className="form-input" {...register("example")} />
-        </div>
-      </div>
       <button type="submit" className="btn-primary w-full sm:w-auto" disabled={isSubmitting}>
         {isSubmitting ? "Saving..." : "Save Proverb"}
       </button>

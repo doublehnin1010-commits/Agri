@@ -6,7 +6,9 @@ from app.db.chroma import connect_chroma
 from app.db.mongodb import close_mongodb, connect_mongodb
 from app.middleware.rbac import RBACMiddleware
 from app.routers import auth, chat, history, import_excel, proverbs, reindex, transcribe
-from app.services.llm import configure_llm
+from app.services.embedding_service import configure_embeddings
+from app.services.llm_service import configure_llm
+from app.services.retriever_service import configure_retriever
 
 
 app = FastAPI(title=settings.app_name)
@@ -32,12 +34,10 @@ app.include_router(reindex.router, prefix=settings.api_v1_prefix, tags=["dataset
 @app.on_event("startup")
 async def on_startup():
     connect_mongodb()
+    configure_embeddings()
     connect_chroma()
     configure_llm()
-
-
-    # Ensure chroma is connected and available for reindex endpoint
-    # (connect_chroma already sets the collection on startup)
+    configure_retriever()
 
 
 @app.on_event("shutdown")
@@ -48,4 +48,3 @@ async def on_shutdown():
 @app.get("/health")
 async def health():
     return {"ok": True, "app": settings.app_name, "env": settings.environment}
-
