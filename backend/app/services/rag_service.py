@@ -234,7 +234,7 @@ ANSWER_PROMPT_MY = ChatPromptTemplate.from_messages(
 Question: {question}
 
 Answer in Burmese. Pick the best context item only. Use 1-2 short teacher-friendly sentences.
-meaning_simple_mm must start with "ကလေးတို့ရေ၊" or "ဆိုလိုတာက".
+meaning_simple_mm must start with "ကလေးတို့ရေ" or "ဆိုလိုတာက".
 Return exactly this JSON:
 {{
   "proverb": "...",
