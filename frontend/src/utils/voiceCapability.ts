@@ -15,8 +15,8 @@ export function isMediaRecorderSupported(): boolean {
 
 export function getVoiceInputMode(): VoiceInputMode {
   if (typeof window === "undefined") return "unavailable";
-  if (getSpeechRecognitionConstructor()) return "speech-api";
   if (isMicrophoneAvailable() && isMediaRecorderSupported()) return "media-recorder";
+  if (getSpeechRecognitionConstructor()) return "speech-api";
   return "unavailable";
 }
 
@@ -42,6 +42,7 @@ export function getPreferredAudioMimeType(): string {
     "audio/mp4",
     "audio/aac",
     "audio/ogg;codecs=opus",
+    "audio/ogg",
   ];
 
   for (const candidate of candidates) {

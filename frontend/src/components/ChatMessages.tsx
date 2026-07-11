@@ -29,8 +29,6 @@ const LOADING_PHRASES = [
 export function ChatMessages({
   messages,
   isResponding = false,
-  onStarterClick,
-  showStarterSuggestions = true,
   emptyStateTitle = "Start a proverb conversation",
   emptyStateDescription = "Use English or Myanmar Unicode to ask for meanings, examples, comparisons, or study guidance.",
 }: ChatMessagesProps) {
