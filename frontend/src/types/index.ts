@@ -71,6 +71,7 @@ export interface Proverb {
   keyword?: string | null;
   proverb: string;
   meaning?: string | null;
+  english_meaning?: string | null;
   example?: string | null;
 }
 

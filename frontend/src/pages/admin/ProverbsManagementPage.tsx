@@ -90,8 +90,15 @@ export function ProverbsManagementPage() {
         cell: ({ row }) => <span className="line-clamp-2 text-slate-600">{row.original.meaning || "No meaning"}</span>,
       },
       {
+        accessorKey: "english_meaning",
+        header: "English",
+        cell: ({ row }) => (
+          <span className="line-clamp-2 text-slate-600">{row.original.english_meaning || "No English meaning"}</span>
+        ),
+      },
+      {
         id: "actions",
-        header: "Actions",
+        header: "Action",
         cell: ({ row }) => (
           <div className="flex flex-wrap gap-2 items-center justify-center">
             <button type="button" className="btn-secondary px-3 py-2" onClick={() => setEditing(row.original)}>
@@ -197,7 +204,7 @@ export function ProverbsManagementPage() {
                   {table.getRowModel().rows.map((row) => (
                     <tr key={row.id}>
                       {row.getVisibleCells().map((cell) => (
-                        <td key={cell.id} className="max-w-xl px-4 py-3 align-top">
+                        <td key={cell.id} className="max-w-md px-4 py-3 align-top">
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </td>
                       ))}
@@ -279,6 +286,7 @@ function ProverbForm({ proverb, isSubmitting, onSubmit }: ProverbFormProps) {
     defaultValues: {
       proverb: proverb?.proverb ?? "",
       meaning: proverb?.meaning ?? "",
+      english_meaning: proverb?.english_meaning ?? "",
       keyword: proverb?.keyword ?? "",
       example: proverb?.example ?? "",
     },
@@ -294,6 +302,10 @@ function ProverbForm({ proverb, isSubmitting, onSubmit }: ProverbFormProps) {
       <div className="space-y-2">
         <label className="form-label" htmlFor="meaning">Meaning</label>
         <textarea id="meaning" rows={5} className="form-input" {...register("meaning")} />
+      </div>
+      <div className="space-y-2">
+        <label className="form-label" htmlFor="english-meaning">English Meaning</label>
+        <textarea id="english-meaning" rows={5} className="form-input" {...register("english_meaning")} />
       </div>
       <button type="submit" className="btn-primary w-full sm:w-auto" disabled={isSubmitting}>
         {isSubmitting ? "Saving..." : "Save Proverb"}

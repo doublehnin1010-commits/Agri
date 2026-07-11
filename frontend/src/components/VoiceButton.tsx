@@ -1,122 +1,91 @@
-import { Loader2, Mic, MicOff } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useVoiceInput } from "../hooks/useVoiceInput";
-import type { SpeechRecognitionLanguage } from "../types/speech";
-import { SPEECH_LANGUAGE_OPTIONS } from "../utils/speechRecognition";
-import { getVoiceUnavailableMessage } from "../utils/voiceCapability";
+import { Mic, MicOff, RotateCcw, Volume2, VolumeX, X } from "lucide-react";
+import type { VoiceConversationStatus } from "../hooks/useVoiceConversation";
 
 interface VoiceButtonProps {
-  onTranscript: (text: string) => void;
-  onInterimTranscript?: (text: string) => void;
+  isVoiceMode: boolean;
+  status: VoiceConversationStatus;
+  isMuted: boolean;
+  canReplay: boolean;
   disabled?: boolean;
-  onListeningChange?: (isListening: boolean) => void;
+  onToggleVoiceMode: () => void;
+  onToggleMute: () => void;
+  onReplay: () => void;
+  onStopSpeaking: () => void;
+  onExit: () => void;
 }
 
 export function VoiceButton({
-  onTranscript,
-  onInterimTranscript,
+  isVoiceMode,
+  status,
+  isMuted,
+  canReplay,
   disabled = false,
-  onListeningChange,
+  onToggleVoiceMode,
+  onToggleMute,
+  onReplay,
+  onStopSpeaking,
+  onExit,
 }: VoiceButtonProps) {
-  const [language, setLanguage] = useState<SpeechRecognitionLanguage>("my-MM");
-
-  const {
-    isSupported,
-    isListening,
-    status,
-    toggleListening,
-    setLanguage: setRecognitionLanguage,
-  } = useVoiceInput({
-    language,
-    onTranscript,
-    onInterimTranscript,
-    onListeningChange,
-  });
-
-  useEffect(() => {
-    setRecognitionLanguage(language);
-  }, [language, setRecognitionLanguage]);
-
-  const isBusy = disabled || status === "processing";
-  const showListening = isListening;
-  const unavailableMessage = getVoiceUnavailableMessage();
-
-  if (!isSupported) {
-    return (
-      <button
-        type="button"
-        disabled
-        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-400 sm:h-12 sm:w-12"
-        aria-label="Voice input unavailable"
-        title={unavailableMessage}
-      >
-        <MicOff className="h-5 w-5" aria-hidden="true" />
-      </button>
-    );
-  }
+  const isSpeaking = status === "speaking";
 
   return (
-    <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-      <div
-        className="flex items-center gap-0.5 rounded-lg border border-slate-200 bg-slate-50 p-0.5"
-        role="group"
-        aria-label="Voice language"
+    <div className="flex shrink-0 items-center gap-1.5">
+      <button
+        type="button"
+        onClick={onToggleVoiceMode}
+        disabled={disabled && !isVoiceMode}
+        className={`relative inline-flex h-11 w-11 items-center justify-center rounded-lg border transition focus:outline-none focus:ring-4 disabled:cursor-not-allowed disabled:opacity-50 sm:h-12 sm:w-12 ${
+          isVoiceMode
+            ? "border-red-300 bg-red-50 text-red-600 focus:ring-red-100"
+            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus:ring-brand-100"
+        }`}
+        aria-label={isVoiceMode ? "Exit voice mode" : "Start voice mode"}
+        aria-pressed={isVoiceMode}
+        title={isVoiceMode ? "Exit voice mode" : "Start voice mode"}
       >
-        {SPEECH_LANGUAGE_OPTIONS.map((option) => {
-          const isActive = language === option.code;
-          return (
-            <button
-              key={option.code}
-              type="button"
-              onClick={() => setLanguage(option.code)}
-              disabled={showListening || isBusy}
-              className={`rounded-md px-1.5 py-1 text-[10px] font-semibold transition sm:px-2 sm:text-xs ${
-                isActive
-                  ? "bg-white text-brand-700 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
-              } disabled:cursor-not-allowed disabled:opacity-50`}
-              aria-pressed={isActive}
-              aria-label={`Recognition language: ${option.label}`}
-            >
-              {option.shortLabel}
-            </button>
-          );
-        })}
-      </div>
+        {isVoiceMode ? (
+          <>
+            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
+            <MicOff className="h-5 w-5" aria-hidden="true" />
+          </>
+        ) : (
+          <Mic className="h-5 w-5" aria-hidden="true" />
+        )}
+      </button>
 
-      <div className="relative">
-        {showListening && (
-          <span
-            className="absolute -right-0.5 -top-0.5 z-10 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white"
-            aria-hidden="true"
-          />
-        )}
-        {showListening && (
-          <span
-            className="absolute inset-0 animate-ping rounded-lg bg-red-400/30"
-            aria-hidden="true"
-          />
-        )}
-        <button
-          type="button"
-          onClick={toggleListening}
-          disabled={isBusy}
-          className={`relative inline-flex h-11 w-11 items-center justify-center rounded-lg border transition focus:outline-none focus:ring-4 disabled:cursor-not-allowed disabled:opacity-50 sm:h-12 sm:w-12 ${
-            showListening
-              ? "border-red-300 bg-red-50 text-red-600 focus:ring-red-100"
-              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus:ring-brand-100"
-          }`}
-          aria-label={showListening ? "Stop voice input" : "Start voice input"}
-          aria-pressed={showListening}
-          title={showListening ? "Listening..." : "Voice input"}
-        >
-          {status === "processing" ? (
-            <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-          ) : (
-            <Mic className={`h-5 w-5 ${showListening ? "animate-pulse" : ""}`} aria-hidden="true" />
-          )}
-        </button>
-      </div>
+      {isVoiceMode ? (
+        <>
+          <button
+            type="button"
+            onClick={onToggleMute}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 sm:h-12 sm:w-12"
+            aria-label={isMuted ? "Unmute AI voice" : "Mute AI voice"}
+            aria-pressed={isMuted}
+            title={isMuted ? "Unmute AI voice" : "Mute AI voice"}
+          >
+            {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+          </button>
+          <button
+            type="button"
+            onClick={isSpeaking ? onStopSpeaking : onReplay}
+            disabled={!isSpeaking && !canReplay}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 disabled:cursor-not-allowed disabled:opacity-50 sm:h-12 sm:w-12"
+            aria-label={isSpeaking ? "Stop speaking" : "Replay last response"}
+            title={isSpeaking ? "Stop speaking" : "Replay last response"}
+          >
+            {isSpeaking ? <X className="h-5 w-5" /> : <RotateCcw className="h-5 w-5" />}
+          </button>
+          <button
+            type="button"
+            onClick={onExit}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 sm:h-12 sm:w-12"
+            aria-label="Exit voice mode"
+            title="Exit voice mode"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </>
+      ) : null}
     </div>
   );
 }

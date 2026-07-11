@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.services.llm_service import (
     agenerate_utility_response,
     generate_utility_response,
+    get_llm,
     get_chat_llm,
     get_str_output_parser,
     safe_json_from_llm,
@@ -60,6 +61,22 @@ Valid intents:
   "Only proverb"
   "Which proverb fits?"
 
+- proverb_list:
+  The user asks for multiple proverbs related to a topic, concept, person, value, category, or keyword.
+  Include a topic field.
+  Examples:
+  "Show me proverbs about teachers." -> {"intent":"proverb_list","topic":"teacher"}
+  "Tell me proverbs related to education." -> {"intent":"proverb_list","topic":"education"}
+  "Give me proverbs about honesty." -> {"intent":"proverb_list","topic":"honesty"}
+
+- proverb_detail:
+  The user refers to one proverb from a previously returned proverb list.
+  Include a selection field.
+  Examples:
+  "Explain number 2." -> {"intent":"proverb_detail","selection":"2"}
+  "Tell me about the first proverb." -> {"intent":"proverb_detail","selection":"1"}
+  "Explain this proverb." -> {"intent":"proverb_detail","selection":"current"}
+
 - translate_previous_to_myanmar:
   The user asks to translate or explain the previous answer in Myanmar/Burmese.
   Examples:
@@ -103,6 +120,19 @@ Valid languages:
 
 Output format:
 
+For proverb_list:
+{
+    "intent": "proverb_list",
+    "topic": "..."
+}
+
+For proverb_detail:
+{
+    "intent": "proverb_detail",
+    "selection": "..."
+}
+
+For all other intents:
 {
     "intent": "<intent>",
     "language": "<my|en>"
@@ -293,8 +323,10 @@ def _elapsed_ms(start: float) -> float:
 
 
 def select_chat_model(question: str, *, language: str = "my", intent: str | None = None) -> str:
-    """Final RAG answer generation always uses the configured chat model."""
+    """Select the final answer model, favoring the fast model for low-latency chat."""
 
+    if settings.fast_response_mode and settings.fast_chat_model.strip():
+        return settings.fast_chat_model
     return settings.chat_model
 
 
@@ -302,7 +334,7 @@ def _get_answer_chain(language: str, model: str | None = None):
     model_name = model or settings.chat_model
     key = (language, model_name)
     if key not in _answer_chains:
-        _answer_chains[key] = _select_answer_prompt(language) | get_chat_llm() | get_str_output_parser()
+        _answer_chains[key] = _select_answer_prompt(language) | get_llm(model_name) | get_str_output_parser()
     return _answer_chains[key]
 
 
@@ -395,8 +427,10 @@ User message:
 
 Return JSON exactly in this shape:
 {{
-  "intent": "role | translate_previous_to_myanmar | proverb_only | proverb_question",
-  "language": "my | en"
+  "intent": "role | translate_previous_to_myanmar | proverb_only | proverb_question | proverb_list | proverb_detail",
+  "language": "my | en",
+  "topic": "optional topic for proverb_list",
+  "selection": "optional selection for proverb_detail"
 }}
 """
     raw = generate_utility_response(prompt, system_instruction=INTENT_CLASSIFIER_SYSTEM_INSTRUCTION)
@@ -412,8 +446,10 @@ User message:
 
 Return JSON exactly in this shape:
 {{
-  "intent": "role | translate_previous_to_myanmar | proverb_only | proverb_question",
-  "language": "my | en"
+  "intent": "role | translate_previous_to_myanmar | proverb_only | proverb_question | proverb_list | proverb_detail",
+  "language": "my | en",
+  "topic": "optional topic for proverb_list",
+  "selection": "optional selection for proverb_detail"
 }}
 """
     raw = await agenerate_utility_response(prompt, system_instruction=INTENT_CLASSIFIER_SYSTEM_INSTRUCTION)

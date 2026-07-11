@@ -35,10 +35,17 @@ def _normalize_row(row: dict[str, Any]) -> dict[str, str | None]:
     keyword = (row.get("keyword") or "").strip() or None
     proverb = (row.get("proverb") or "").strip()
     meaning = (row.get("meaning") or "").strip() or None
+    english_meaning = (row.get("english_meaning") or row.get("englishMeaning") or "").strip() or None
     example = (row.get("example") or "").strip() or None
     if not proverb:
         raise ValueError("proverb is required")
-    return {"keyword": keyword, "proverb": proverb, "meaning": meaning, "example": example}
+    return {
+        "keyword": keyword,
+        "proverb": proverb,
+        "meaning": meaning,
+        "english_meaning": english_meaning,
+        "example": example,
+    }
 
 
 def _language_from_question(question: str) -> str:
@@ -64,10 +71,9 @@ def _classify_user_intent(question: str) -> dict[str, Any]:
 
     builtin_intent = _infer_builtin_intent(question)
     if builtin_intent:
-        return {
-            "intent": builtin_intent,
-            "language": fallback["language"],
-        }
+        if isinstance(builtin_intent, str):
+            return {"intent": builtin_intent, "language": fallback["language"]}
+        return {**fallback, **builtin_intent}
 
     return fallback
 
@@ -82,18 +88,25 @@ async def _aclassify_user_intent(question: str) -> dict[str, Any]:
 
     builtin_intent = _infer_builtin_intent(question)
     if builtin_intent:
-        return {
-            "intent": builtin_intent,
-            "language": fallback["language"],
-        }
+        if isinstance(builtin_intent, str):
+            return {"intent": builtin_intent, "language": fallback["language"]}
+        return {**fallback, **builtin_intent}
 
     return fallback
 
 
-def _infer_builtin_intent(question: str) -> str | None:
+def _infer_builtin_intent(question: str) -> dict[str, Any] | str | None:
     normalized = _normalize_search_text(question)
     compact = _compact_search_text(normalized)
     plain_compact = re.sub(r"\s+", "", unicodedata.normalize("NFC", normalized))
+
+    detail_selection = _extract_detail_selection(normalized)
+    if detail_selection:
+        return {"intent": "proverb_detail", "selection": detail_selection}
+
+    list_topic = _extract_proverb_list_topic(normalized)
+    if list_topic:
+        return {"intent": "proverb_list", "topic": list_topic}
 
     if re.search(r"\b(hi|hello|hey|good morning|good afternoon|good evening)\b", normalized):
         return "greeting"
@@ -139,6 +152,9 @@ def _infer_builtin_intent(question: str) -> str | None:
     if any(text in normalized for text in ["english", "in english", "explain in english"]):
         return "translate_previous_to_english"
 
+    if re.search(r"\bwhich proverb fits\b", normalized):
+        return "proverb_only"
+
     if re.search(r"\b(thanks|thank you|thx|ty)\b", normalized):
         return "thanks"
 
@@ -151,6 +167,62 @@ def _infer_builtin_intent(question: str) -> str | None:
     if any(text in plain_compact for text in ["နောက်မှတွေ့မယ်", "သွားပြီ", "တာ့တာ", "ဘိုင်"]):
         return "goodbye"
 
+    return None
+
+
+def _extract_proverb_list_topic(normalized: str) -> str | None:
+    has_english_list_request = bool(
+        re.search(r"\b(proverbs|all proverbs)\b", normalized)
+        and re.search(r"\b(show|tell|give|list|find|what|which)\b", normalized)
+    )
+    has_myanmar_list_request = "စကားပုံ" in normalized and any(
+        marker in normalized
+        for marker in ["တွေ", "များ", "ပြော", "ပြပါ", "ရှာ", "ဖော်ပြ", "ပေး"]
+    )
+    if not has_english_list_request and not has_myanmar_list_request:
+        return None
+
+    if has_myanmar_list_request:
+        topic = normalized
+        topic = topic.split("စကားပုံ", 1)[0]
+        topic = re.sub(r"(မြန်မာ|နှင့်|နဲ့|နဲ့ပတ်သက်တဲ့|နှင့်ပတ်သက်သော|ပတ်သက်တဲ့|ပတ်သက်သော|အကြောင်း|အတွက်)", " ", topic)
+        topic = " ".join(topic.split()).strip(" ?။၊.")
+        return topic or normalized
+
+    topic_match = re.search(r"\b(?:about|related to|talk about|for|on)\s+(.+)$", normalized)
+    topic = topic_match.group(1) if topic_match else normalized
+    topic = re.sub(r"\b(please|proverbs?|all|me|the|some|related|to)\b", " ", topic)
+    topic = " ".join(topic.split()).strip(" ?.")
+    return topic or normalized
+
+
+def _extract_detail_selection(normalized: str) -> str | None:
+    has_english_detail = bool(re.search(r"\b(explain|tell|detail|meaning|about|want)\b", normalized))
+    has_myanmar_detail = any(marker in normalized for marker in ["နံပါတ်", "ရှင်းပြ", "အဓိပ္ပါယ်", "ပြောပြ"])
+    if not has_english_detail and not has_myanmar_detail:
+        return None
+
+    number_match = re.search(r"\b(?:number|no\.?|#)?\s*([1-9][0-9]?)\b", normalized)
+    if number_match:
+        return number_match.group(1)
+
+    myanmar_number_match = re.search(r"(?:နံပါတ်)?\s*([၁၂၃၄၅၆၇၈၉][၀-၉]?)", normalized)
+    if myanmar_number_match:
+        return myanmar_number_match.group(1).translate(str.maketrans("၀၁၂၃၄၅၆၇၈၉", "0123456789"))
+
+    word_numbers = {
+        "first": "1",
+        "second": "2",
+        "third": "3",
+        "fourth": "4",
+        "fifth": "5",
+    }
+    for word, number in word_numbers.items():
+        if re.search(rf"\b{word}\b", normalized):
+            return number
+
+    if re.search(r"\b(this|current|that)\s+proverb\b", normalized):
+        return "current"
     return None
 
 
@@ -292,12 +364,20 @@ def _build_chroma_record(row: dict[str, str | None]) -> tuple[str, str, dict[str
     keyword = row["keyword"]
     proverb = row["proverb"]
     meaning = row["meaning"]
+    english_meaning = row.get("english_meaning")
     example = row["example"]
-    doc = f"keyword: {keyword or ''}\nproverb: {proverb}\nmeaning: {meaning or ''}\nexample: {example or ''}"
+    doc = (
+        f"keyword: {keyword or ''}\n"
+        f"proverb: {proverb}\n"
+        f"meaning: {meaning or ''}\n"
+        f"english_meaning: {english_meaning or ''}\n"
+        f"example: {example or ''}"
+    )
     metadata = {
         "keyword": keyword,
         "proverb": proverb,
         "meaning": meaning,
+        "english_meaning": english_meaning,
         "example": example,
     }
     return _row_id(keyword, proverb), doc, metadata
@@ -331,6 +411,7 @@ def list_proverbs(limit: int = 500, offset: int = 0) -> list[dict[str, Any]]:
                 "keyword": metadata.get("keyword"),
                 "proverb": metadata.get("proverb") or "",
                 "meaning": metadata.get("meaning"),
+                "english_meaning": metadata.get("english_meaning"),
                 "example": metadata.get("example"),
             }
         )
@@ -350,6 +431,7 @@ def update_proverb(proverb_id: str, updates: dict[str, Any]) -> dict[str, Any]:
         "keyword": updates.get("keyword", current.get("keyword")),
         "proverb": updates.get("proverb", current.get("proverb")),
         "meaning": updates.get("meaning", current.get("meaning")),
+        "english_meaning": updates.get("english_meaning", current.get("english_meaning")),
         "example": updates.get("example", current.get("example")),
     }
     normalized = _normalize_row(merged)
@@ -428,6 +510,49 @@ def _answer_from_best_source(sources: list[dict[str, Any]], language: str = "my"
     )
 
 
+def _proverb_list_answer(sources: list[dict[str, Any]], topic: str, language: str) -> dict[str, Any]:
+    items = [source for source in sources if source.get("proverb")][:5]
+    if not items:
+        return _no_result_answer(language)
+
+    heading = (
+        f"Here are proverbs related to {topic}:"
+        if language == "en"
+        else f"{topic} related proverbs:"
+    )
+    lines = [heading, *[f"{index}. {item.get('proverb')}" for index, item in enumerate(items, start=1)]]
+    return {
+        "proverb": None,
+        "meaning_simple_mm": "\n".join(lines),
+        "example_mm": "အသေးစိတ်အချက်အလက်များကို သိရှိလိုပါက သက်ဆိုင်ရာ နံပါတ်ကို ဖော်ပြ၍ မေးမြန်းနိုင်ပါသည်။ ဥပမာ - 'နံပါတ် ၂ အား ရှင်းပြပါ'။",
+        "sources": items,
+        "intent": "proverb_list",
+    }
+
+
+def _selected_source_from_previous(previous_answer: dict[str, Any] | None, selection: str) -> dict[str, Any] | None:
+    if not previous_answer:
+        return None
+
+    sources = previous_answer.get("sources") or []
+    if selection == "current":
+        if previous_answer.get("proverb"):
+            return {
+                "proverb": previous_answer.get("proverb"),
+                "meaning": previous_answer.get("meaning_simple_mm") or previous_answer.get("meaning"),
+                "example": previous_answer.get("example_mm") or previous_answer.get("example"),
+            }
+        return sources[0] if sources else None
+
+    try:
+        index = int(selection) - 1
+    except ValueError:
+        return None
+    if index < 0 or index >= len(sources):
+        return None
+    return sources[index]
+
+
 def rag_answer(user_question: str, previous_answer: dict[str, Any] | None = None) -> dict[str, Any]:
     return asyncio.run(arag_answer(user_question, previous_answer=previous_answer))
 
@@ -464,6 +589,19 @@ async def arag_answer(user_question: str, previous_answer: dict[str, Any] | None
 
     if intent == "role":
         return _role_answer(response_language)
+
+    if intent == "proverb_list":
+        topic = str(user_intent.get("topic") or user_question).strip()
+        sources = await aretrieve_context(topic, top_k=max(5, settings.rag_top_k))
+        if not sources or not is_context_relevant(sources):
+            return _no_result_answer(response_language)
+        return _proverb_list_answer(sources, topic, response_language)
+
+    if intent == "proverb_detail":
+        source = _selected_source_from_previous(previous_answer, str(user_intent.get("selection") or "current"))
+        if not source:
+            return _no_result_answer(response_language)
+        return _answer_from_best_source([source], response_language)
 
     if intent == "proverb_only":
         sources = await aretrieve_context(user_question, top_k=settings.rag_top_k)

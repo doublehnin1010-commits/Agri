@@ -8,7 +8,7 @@ from typing import Any
 from app.core.config import settings
 
 
-# Burmese error message when context is empty or irrelevant
+
 NO_PROVERB_MESSAGE = "ဝမ်းနည်းပါတယ်။ ကျွန်ုပ်၏ စကားပုံဒေတာအတွင်း မတွေ့ရှိပါ။"
 
 

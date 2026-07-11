@@ -1,7 +1,7 @@
 import { apiClient } from "../api/client";
 import type { Proverb } from "../types";
 
-export type ProverbPayload = Pick<Proverb, "proverb" | "meaning"> & {
+export type ProverbPayload = Pick<Proverb, "proverb" | "meaning" | "english_meaning"> & {
   keyword?: string;
   example?: string;
 };
@@ -25,6 +25,7 @@ export async function createProverb(payload: ProverbPayload): Promise<Proverb> {
     keyword: payload.keyword ?? "",
     proverb: payload.proverb,
     meaning: payload.meaning,
+    english_meaning: payload.english_meaning ?? "",
     example: payload.example ?? "",
   });
   return data;
