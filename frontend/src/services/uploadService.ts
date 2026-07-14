@@ -2,14 +2,17 @@ import { apiClient } from "../api/client";
 import type { ImportJobProgress, ImportJobUploadResponse } from "../types";
 
 const POLL_INTERVAL_MS = 2000;
+export type DatasetType = "docx" | "txt";
 
-export async function importDocx(
+export async function importKnowledge(
+  datasetType: DatasetType,
   proverbsFile: File,
   meaningsFile: File,
   englishMeaningsFile: File,
   onProgress?: (progress: ImportJobProgress) => void,
 ): Promise<ImportJobProgress> {
   const formData = new FormData();
+  formData.append("dataset_type", datasetType);
   formData.append("proverbs_file", proverbsFile);
   formData.append("meanings_file", meaningsFile);
   formData.append("english_meanings_file", englishMeaningsFile);
@@ -29,6 +32,15 @@ export async function importDocx(
   });
 
   return pollImportJobStatus(data.job_id, onProgress);
+}
+
+export async function importDocx(
+  proverbsFile: File,
+  meaningsFile: File,
+  englishMeaningsFile: File,
+  onProgress?: (progress: ImportJobProgress) => void,
+): Promise<ImportJobProgress> {
+  return importKnowledge("docx", proverbsFile, meaningsFile, englishMeaningsFile, onProgress);
 }
 
 export async function getImportJobStatus(jobId: string): Promise<ImportJobProgress> {

@@ -90,6 +90,7 @@ export interface ImportJobUploadResponse {
 }
 
 export interface ImportJobProgress {
+  success?: boolean;
   job_id: string;
   status: "uploaded" | "processing" | "embedding" | "completed" | "failed";
   current?: number;
@@ -98,6 +99,8 @@ export interface ImportJobProgress {
   step?: string;
   failed?: number;
   estimated_remaining?: number;
+  documents_imported?: number;
+  embeddings_created?: number;
   documents?: number;
   processing_time_seconds?: number;
   error?: string;

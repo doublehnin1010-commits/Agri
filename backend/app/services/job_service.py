@@ -95,8 +95,11 @@ class ImportJobService:
         payload = asdict(job)
         if payload["status"] == "completed":
             return {
+                "success": True,
                 "job_id": job.job_id,
                 "status": job.status,
+                "documents_imported": job.documents,
+                "embeddings_created": job.documents,
                 "documents": job.documents,
                 "failed": job.failed,
                 "processing_time_seconds": job.processing_time_seconds,

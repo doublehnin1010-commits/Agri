@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import BackgroundTasks, UploadFile
 
 from app.core.config import BACKEND_DIR
+from app.readers import DatasetRows, DocxReader, DocumentReader, TxtReader
 from app.services.embedding_service import (
     build_embedding_documents,
     upsert_embedding_documents,
@@ -20,7 +21,6 @@ from app.services.metadata_service import (
     metadata_batch_size,
     metadata_max_concurrent,
 )
-from app.services.reindex import read_docx_lines
 
 
 LOG_DIR = BACKEND_DIR / "logs"
@@ -49,14 +49,27 @@ class ImportUploadResult:
     message: str
 
 
-def _validate_docx_upload(file: UploadFile | None, label: str) -> UploadFile:
-    """Validate a required DOCX upload by presence and extension."""
+READERS: dict[str, DocumentReader] = {
+    "docx": DocxReader(),
+    "txt": TxtReader(),
+}
+
+
+def _normalize_dataset_type(dataset_type: str | None) -> str:
+    normalized = (dataset_type or "docx").strip().lower()
+    if normalized not in READERS:
+        raise ImportValidationError("Only DOCX or TXT files are supported.")
+    return normalized
+
+
+def _validate_upload(file: UploadFile | None, extension: str) -> UploadFile:
+    """Validate a required dataset upload by presence and extension."""
 
     if file is None or not file.filename:
-        raise ImportValidationError(f"{label} file is required")
+        raise ImportValidationError("Missing required files.")
 
-    if not file.filename.lower().endswith(".docx"):
-        raise ImportValidationError(f"{label} must be a .docx file")
+    if not file.filename.lower().endswith(extension):
+        raise ImportValidationError("Only DOCX or TXT files are supported.")
 
     return file
 
@@ -72,26 +85,22 @@ async def _save_upload(upload: UploadFile, destination: Path) -> None:
     await asyncio.to_thread(_save_upload_sync, upload, destination)
 
 
-def _merge_docx_rows(
-    proverbs: list[str],
-    meanings: list[str],
-    english_meanings: list[str],
-) -> list[tuple[str, str, str]]:
-    """Merge proverb, meaning, and English meaning paragraphs by index."""
+def _merge_rows(dataset: DatasetRows, extension: str) -> list[tuple[str, str, str]]:
+    """Merge proverb, meaning, and English meaning records by index."""
 
     counts = {
-        "Proverbs.docx": len(proverbs),
-        "Meanings.docx": len(meanings),
-        "EnglishMeanings.docx": len(english_meanings),
+        f"Proverbs{extension}": len(dataset.proverbs),
+        f"Meanings{extension}": len(dataset.meanings),
+        f"EnglishMeanings{extension}": len(dataset.english_meanings),
     }
+    if any(count == 0 for count in counts.values()):
+        raise ImportValidationError("Uploaded files must not be empty.")
+
     if len(set(counts.values())) != 1:
         details = ", ".join(f"{name}={count}" for name, count in counts.items())
-        raise ImportValidationError(
-            "Uploaded DOCX files must have the same number of non-empty paragraphs "
-            f"({details})"
-        )
+        raise ImportValidationError(f"Record counts do not match. ({details})")
 
-    return list(zip(proverbs, meanings, english_meanings))
+    return list(zip(dataset.proverbs, dataset.meanings, dataset.english_meanings))
 
 
 async def start_import(
@@ -99,21 +108,26 @@ async def start_import(
     meanings_file: UploadFile | None,
     english_meanings_file: UploadFile | None,
     background_tasks: BackgroundTasks,
+    dataset_type: str | None = "docx",
 ) -> ImportUploadResult:
     """Validate and persist uploaded files, then enqueue background ingestion."""
 
-    validated_proverbs = _validate_docx_upload(proverbs_file, "Proverbs")
-    validated_meanings = _validate_docx_upload(meanings_file, "Meanings")
-    validated_english_meanings = _validate_docx_upload(
+    normalized_dataset_type = _normalize_dataset_type(dataset_type)
+    reader = READERS[normalized_dataset_type]
+    extension = reader.extension
+
+    validated_proverbs = _validate_upload(proverbs_file, extension)
+    validated_meanings = _validate_upload(meanings_file, extension)
+    validated_english_meanings = _validate_upload(
         english_meanings_file,
-        "EnglishMeanings",
+        extension,
     )
 
     job = job_service.create_job()
     job_upload_dir = UPLOAD_DIR / job.job_id
-    proverbs_path = job_upload_dir / "Proverbs.docx"
-    meanings_path = job_upload_dir / "Meanings.docx"
-    english_meanings_path = job_upload_dir / "EnglishMeanings.docx"
+    proverbs_path = job_upload_dir / f"Proverbs{extension}"
+    meanings_path = job_upload_dir / f"Meanings{extension}"
+    english_meanings_path = job_upload_dir / f"EnglishMeanings{extension}"
 
     await asyncio.gather(
         _save_upload(validated_proverbs, proverbs_path),
@@ -125,6 +139,7 @@ async def start_import(
     background_tasks.add_task(
         process_import_job,
         job.job_id,
+        normalized_dataset_type,
         proverbs_path,
         meanings_path,
         english_meanings_path,
@@ -139,27 +154,31 @@ async def start_import(
 
 async def process_import_job(
     job_id: str,
+    dataset_type: str,
     proverbs_path: Path,
     meanings_path: Path,
     english_meanings_path: Path,
 ) -> None:
-    """Run the DOCX ingestion pipeline for a queued import job."""
+    """Run the ingestion pipeline for a queued import job."""
 
     started_at = time.perf_counter()
     logger.info("Job %s started.", job_id)
 
     try:
-        job_service.update_job(job_id, status="processing", step="Reading DOCX")
-        proverbs, meanings, english_meanings = await asyncio.gather(
-            asyncio.to_thread(read_docx_lines, str(proverbs_path)),
-            asyncio.to_thread(read_docx_lines, str(meanings_path)),
-            asyncio.to_thread(read_docx_lines, str(english_meanings_path)),
+        reader = READERS[_normalize_dataset_type(dataset_type)]
+
+        job_service.update_job(job_id, status="processing", step="Reading files...")
+        dataset = await asyncio.to_thread(
+            reader.read_dataset,
+            proverbs_path,
+            meanings_path,
+            english_meanings_path,
         )
 
-        job_service.update_job(job_id, step="Validating Paragraph Counts")
-        rows = _merge_docx_rows(proverbs, meanings, english_meanings)
+        job_service.update_job(job_id, step="Validating...")
+        rows = _merge_rows(dataset, reader.extension)
         total = len(rows)
-        job_service.update_job(job_id, total=total, current=0, step="Generating Metadata")
+        job_service.update_job(job_id, total=total, current=0, step="Generating metadata...")
 
         logger.info("Job %s generating metadata for %s records.", job_id, total)
 
@@ -200,7 +219,7 @@ async def process_import_job(
                 status="processing",
                 metadata_current=metadata_processed,
                 failed=failed,
-                step="Generating Metadata",
+                step="Generating metadata...",
             )
 
             batch_rows = [rows[row_number - 1] for row_number, *_ in batch]
@@ -213,7 +232,7 @@ async def process_import_job(
                     job_id,
                     status="embedding",
                     failed=failed,
-                    step="Embedding",
+                    step="Generating embeddings...",
                 )
 
             async with embed_lock:
@@ -225,7 +244,7 @@ async def process_import_job(
                         status="embedding",
                         embed_current=batch_embed_base + saved_count,
                         failed=failed,
-                        step="Saving to ChromaDB",
+                        step="Saving to ChromaDB...",
                     ),
                 )
 
@@ -235,7 +254,7 @@ async def process_import_job(
                 status="embedding",
                 embed_current=embeddings_created,
                 failed=failed,
-                step="Saving to ChromaDB",
+                step="Saving to ChromaDB...",
             )
 
         batch_tasks = [

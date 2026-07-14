@@ -12,3 +12,7 @@
 2026-07-03 12:00:43,209 INFO [import_jobs] Job 71a2123bca7d446a8c56961e866a1c23 started.
 2026-07-03 12:00:43,403 INFO [import_jobs] Job 71a2123bca7d446a8c56961e866a1c23 generating metadata for 133 records.
 2026-07-03 12:18:20,387 INFO [import_jobs] Job 71a2123bca7d446a8c56961e866a1c23 completed in 1057.18 seconds. documents=133 failed=133
+2026-07-14 22:02:07,717 INFO [import_jobs] Job 000bc714e07a46c385bdf90bc76549c1 uploaded files and queued processing.
+2026-07-14 22:02:07,718 INFO [import_jobs] Job 000bc714e07a46c385bdf90bc76549c1 started.
+2026-07-14 22:02:07,804 INFO [import_jobs] Job 000bc714e07a46c385bdf90bc76549c1 generating metadata for 1839 records.
+2026-07-14 23:08:58,537 INFO [import_jobs] Job 000bc714e07a46c385bdf90bc76549c1 completed in 4010.82 seconds. documents=1839 failed=1839

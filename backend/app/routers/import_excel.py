@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 
 from app.core.deps import require_admin
 from app.services import import_service
@@ -12,6 +12,7 @@ router = APIRouter()
 @router.post("/import-docx")
 async def import_docx(
     background_tasks: BackgroundTasks,
+    dataset_type: str = Form("docx"),
     proverbs_file: UploadFile | None = File(None),
     meanings_file: UploadFile | None = File(None),
     english_meanings_file: UploadFile | None = File(None),
@@ -23,11 +24,12 @@ async def import_docx(
             meanings_file,
             english_meanings_file,
             background_tasks,
+            dataset_type,
         )
     except ImportValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to import Word files: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to import knowledge files: {e}")
 
     return {
         "job_id": result.job_id,

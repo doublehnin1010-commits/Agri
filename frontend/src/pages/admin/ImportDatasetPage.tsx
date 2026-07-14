@@ -2,23 +2,29 @@ import { UploadCloud, X } from "lucide-react";
 import { DragEvent, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { getApiErrorMessage } from "../../api/client";
-import { importDocx } from "../../services/uploadService";
+import { importKnowledge, type DatasetType } from "../../services/uploadService";
 import type { ImportJobProgress } from "../../types";
 
 type FileKind = "proverbs" | "meanings" | "englishMeanings";
 
 const STEP_LABELS: Record<string, string> = {
   Uploading: "Uploading",
-  "Reading DOCX": "Reading DOCX",
-  "Validating Paragraph Counts": "Validating files",
-  "Generating Metadata": "Generating Metadata",
-  Embedding: "Embedding",
-  "Saving to ChromaDB": "Saving to ChromaDB",
+  "Reading files...": "Reading files...",
+  "Validating...": "Validating...",
+  "Generating metadata...": "Generating metadata...",
+  "Generating embeddings...": "Generating embeddings...",
+  "Saving to ChromaDB...": "Saving to ChromaDB...",
   Completed: "Completed",
   Failed: "Failed",
 };
 
+const FORMAT_OPTIONS: Array<{ value: DatasetType; label: string; description: string }> = [
+  { value: "docx", label: "Microsoft Word (.docx)", description: "Proverbs.docx, Meanings.docx, EnglishMeanings.docx" },
+  { value: "txt", label: "Plain Text (.txt)", description: "Proverbs.txt, Meanings.txt, EnglishMeanings.txt" },
+];
+
 export function ImportDatasetPage() {
+  const [datasetType, setDatasetType] = useState<DatasetType>("docx");
   const [proverbsFile, setProverbsFile] = useState<File | null>(null);
   const [meaningsFile, setMeaningsFile] = useState<File | null>(null);
   const [englishMeaningsFile, setEnglishMeaningsFile] = useState<File | null>(null);
@@ -38,10 +44,22 @@ export function ImportDatasetPage() {
   }, [jobProgress]);
 
   const stepLabel = jobProgress?.step ? STEP_LABELS[jobProgress.step] ?? jobProgress.step : "Ready";
+  const extension = datasetType === "docx" ? ".docx" : ".txt";
+  const accept =
+    datasetType === "docx"
+      ? ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      : ".txt,text/plain";
+
+  const clearFiles = () => {
+    setProverbsFile(null);
+    setMeaningsFile(null);
+    setEnglishMeaningsFile(null);
+    setJobProgress(null);
+  };
 
   const assignFile = (file: File, kind: FileKind) => {
-    if (!file.name.toLowerCase().endsWith(".docx")) {
-      toast.error("Only .docx files are supported");
+    if (!file.name.toLowerCase().endsWith(extension)) {
+      toast.error("Only DOCX or TXT files are supported.");
       return;
     }
     if (kind === "proverbs") setProverbsFile(file);
@@ -60,7 +78,8 @@ export function ImportDatasetPage() {
     setIsUploading(true);
     setJobProgress(null);
     try {
-      const result = await importDocx(
+      const result = await importKnowledge(
+        datasetType,
         proverbsFile,
         meaningsFile,
         englishMeaningsFile,
@@ -83,15 +102,61 @@ export function ImportDatasetPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-950">Import Dataset</h1>
+        <h1 className="text-2xl font-bold text-slate-950">Knowledge Import</h1>
         <p className="mt-2 text-sm text-slate-500">
-          Upload matching proverb, Myanmar meaning, and English meaning Word documents.
+          Import proverb knowledge into the AI Knowledge Base using Microsoft Word or Plain Text datasets.
         </p>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="text-base font-bold text-slate-950">Knowledge Import</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+              Import proverb knowledge into the AI Knowledge Base using Microsoft Word or Plain Text datasets.
+            </p>
+            <p className="mt-4 text-xs font-bold uppercase text-slate-500">Supported formats</p>
+            <div className="mt-2 flex flex-wrap gap-2 text-sm font-semibold text-slate-700">
+              <span className="rounded bg-slate-100 px-2.5 py-1">Microsoft Word (.docx)</span>
+              <span className="rounded bg-slate-100 px-2.5 py-1">Plain Text (.txt)</span>
+            </div>
+          </div>
+          <fieldset className="min-w-full space-y-2 lg:min-w-80">
+            <legend className="text-sm font-bold text-slate-950">Dataset type</legend>
+            {FORMAT_OPTIONS.map((option) => (
+              <label
+                key={option.value}
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition ${
+                  datasetType === option.value ? "border-brand-300 bg-brand-50" : "border-slate-200 hover:bg-slate-50"
+                } ${isUploading ? "cursor-not-allowed opacity-60" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name="datasetType"
+                  value={option.value}
+                  checked={datasetType === option.value}
+                  disabled={isUploading}
+                  onChange={() => {
+                    setDatasetType(option.value);
+                    clearFiles();
+                  }}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block text-sm font-bold text-slate-950">{option.label}</span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">{option.description}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <UploadBox
-          label="Proverbs.docx"
+          label={`Proverbs${extension}`}
+          extension={extension}
+          accept={accept}
           file={proverbsFile}
           onDrop={(event) => handleDrop(event, "proverbs")}
           onChange={(file) => assignFile(file, "proverbs")}
@@ -99,7 +164,9 @@ export function ImportDatasetPage() {
           disabled={isUploading}
         />
         <UploadBox
-          label="Meanings.docx"
+          label={`Meanings${extension}`}
+          extension={extension}
+          accept={accept}
           file={meaningsFile}
           onDrop={(event) => handleDrop(event, "meanings")}
           onChange={(file) => assignFile(file, "meanings")}
@@ -107,7 +174,9 @@ export function ImportDatasetPage() {
           disabled={isUploading}
         />
         <UploadBox
-          label="EnglishMeanings.docx"
+          label={`EnglishMeanings${extension}`}
+          extension={extension}
+          accept={accept}
           file={englishMeaningsFile}
           onDrop={(event) => handleDrop(event, "englishMeanings")}
           onChange={(file) => assignFile(file, "englishMeanings")}
@@ -134,14 +203,14 @@ export function ImportDatasetPage() {
               <p className="mt-2 text-sm text-slate-500">
                 {jobProgress.current ?? 0} / {jobProgress.total}
                 {typeof jobProgress.estimated_remaining === "number" && jobProgress.status !== "completed"
-                  ? ` · ${jobProgress.estimated_remaining} remaining`
+                  ? ` - ${jobProgress.estimated_remaining} remaining`
                   : null}
               </p>
             ) : null}
           </div>
           <button type="button" className="btn-primary" disabled={!canUpload} onClick={handleUpload}>
             <UploadCloud className="h-4 w-4" aria-hidden="true" />
-            {isUploading ? "Processing..." : "Import Dataset"}
+            {isUploading ? "Processing..." : "Knowledge Import"}
           </button>
         </div>
       </div>
@@ -150,10 +219,10 @@ export function ImportDatasetPage() {
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-900">
           <p className="font-bold">Import complete</p>
           <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <ResultStat label="Documents" value={jobProgress.documents ?? 0} />
-            <ResultStat label="Metadata failed" value={jobProgress.failed ?? 0} />
+            <ResultStat label="Documents imported" value={jobProgress.documents_imported ?? jobProgress.documents ?? 0} />
+            <ResultStat label="Embeddings created" value={jobProgress.embeddings_created ?? jobProgress.documents ?? 0} />
+            <ResultStat label="Failed" value={jobProgress.failed ?? 0} />
             <ResultStat label="Seconds" value={jobProgress.processing_time_seconds ?? 0} />
-            <ResultStat label="Job ID" value={jobProgress.job_id.slice(0, 8)} />
           </dl>
         </div>
       ) : null}
@@ -184,6 +253,8 @@ function ResultStat({ label, value }: ResultStatProps) {
 
 interface UploadBoxProps {
   label: string;
+  extension: string;
+  accept: string;
   file: File | null;
   disabled?: boolean;
   onDrop: (event: DragEvent<HTMLLabelElement>) => void;
@@ -191,7 +262,7 @@ interface UploadBoxProps {
   onClear: () => void;
 }
 
-function UploadBox({ label, file, disabled = false, onDrop, onChange, onClear }: UploadBoxProps) {
+function UploadBox({ label, extension, accept, file, disabled = false, onDrop, onChange, onClear }: UploadBoxProps) {
   return (
     <label
       className={`flex min-h-56 flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-white p-6 text-center shadow-sm transition ${
@@ -202,10 +273,10 @@ function UploadBox({ label, file, disabled = false, onDrop, onChange, onClear }:
     >
       <UploadCloud className="h-10 w-10 text-brand-700" aria-hidden="true" />
       <span className="mt-4 text-base font-bold text-slate-950">{label}</span>
-      <span className="mt-2 text-sm leading-6 text-slate-500">Drag and drop or browse for a .docx file</span>
+      <span className="mt-2 text-sm leading-6 text-slate-500">Drag and drop or browse for a {extension} file</span>
       <input
         type="file"
-        accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        accept={accept}
         className="sr-only"
         disabled={disabled}
         onChange={(event) => {

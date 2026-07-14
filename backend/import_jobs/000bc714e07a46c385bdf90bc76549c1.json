@@ -1,0 +1,17 @@
+{
+  "job_id": "000bc714e07a46c385bdf90bc76549c1",
+  "status": "completed",
+  "current": 3678,
+  "total": 1839,
+  "progress": 100.0,
+  "step": "Completed",
+  "failed": 1839,
+  "documents": 1839,
+  "processing_time_seconds": 4010.82,
+  "estimated_remaining": 0,
+  "metadata_current": 1839,
+  "embed_current": 1839,
+  "error": null,
+  "created_at": 1784043127.7128499,
+  "updated_at": 1784047138.5368829
+}

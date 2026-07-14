@@ -10,7 +10,7 @@ interface AdminSidebarProps {
 const items = [
   { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
   {label : "Open Chat" , to : "/dashboard" , icon : Book },
-  { label: "Import Dataset", to: "/admin/import", icon: DatabaseZap },
+  { label: "Knowledge Import", to: "/admin/import", icon: DatabaseZap },
   { label: "Proverbs Management", to: "/admin/proverbs", icon: LibraryBig },
 ];
 

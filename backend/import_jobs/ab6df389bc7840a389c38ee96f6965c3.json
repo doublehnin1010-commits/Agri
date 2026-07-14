@@ -1,0 +1,17 @@
+{
+  "job_id": "ab6df389bc7840a389c38ee96f6965c3",
+  "status": "failed",
+  "current": 0,
+  "total": 0,
+  "progress": 0.0,
+  "step": "Failed",
+  "failed": 0,
+  "documents": 0,
+  "processing_time_seconds": 2.63,
+  "estimated_remaining": 0,
+  "metadata_current": 0,
+  "embed_current": 0,
+  "error": "Uploaded DOCX files must have the same number of non-empty paragraphs (Proverbs.docx=1839, Meanings.docx=1840, EnglishMeanings.docx=1839)",
+  "created_at": 1784040443.2670796,
+  "updated_at": 1784040445.906235
+}
