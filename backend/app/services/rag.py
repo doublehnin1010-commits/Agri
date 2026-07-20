@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import asyncio
 import hashlib
@@ -17,6 +17,7 @@ from app.services.guardrails import (
     is_context_relevant,
     validate_question,
 )
+from app.services.conversation_memory import ConversationMemoryService
 from app.services.rag_service import arun_rag_chain, parse_rag_answer
 from app.services.retriever_service import (
     _compact_search_text,
@@ -63,7 +64,7 @@ def _language_from_question(question: str) -> str:
 
 def _classify_user_intent(question: str) -> dict[str, Any]:
     fallback = {
-        "intent": "proverb_question",
+        "intent": "proverb_query",
         "language": _language_from_question(question),
     }
     if not question or not question.strip():
@@ -80,7 +81,7 @@ def _classify_user_intent(question: str) -> dict[str, Any]:
 
 async def _aclassify_user_intent(question: str) -> dict[str, Any]:
     fallback = {
-        "intent": "proverb_question",
+        "intent": "proverb_query",
         "language": _language_from_question(question),
     }
     if not question or not question.strip():
@@ -95,24 +96,51 @@ async def _aclassify_user_intent(question: str) -> dict[str, Any]:
     return fallback
 
 
+async def classify_user_intent(question: str) -> dict[str, Any]:
+    """Public deterministic classifier used by chat routing and memory."""
+    return await _aclassify_user_intent(question)
+
+
 def _infer_builtin_intent(question: str) -> dict[str, Any] | str | None:
     normalized = _normalize_search_text(question)
     compact = _compact_search_text(normalized)
     plain_compact = re.sub(r"\s+", "", unicodedata.normalize("NFC", normalized))
 
+    if re.fullmatch(r"(?:explain more|tell me more|more detail)[.!?]*", normalized):
+        return {"intent": "follow_up", "action": "explain_more"}
+
+    if re.fullmatch(r"(?:give|show)(?: me)? (?:an )?example[.!?]*", normalized):
+        return {"intent": "follow_up", "action": "example"}
+
+    if any(marker in plain_compact for marker in ["အသေးစိတ်ရှင်းပြပါ", "ဥပမာပေးပါ", "ဥပမာပြပါ"]):
+        action = "example" if "ဥပမာ" in plain_compact else "explain_more"
+        return {"intent": "follow_up", "action": action}
+
+    if re.search(r"\b(?:english meaning|meaning in english)\b", normalized):
+        return {"intent": "follow_up", "action": "english_meaning"}
+
+    if re.fullmatch(r"(?:what does (?:this|it) mean|what is the meaning)[?!.]*", normalized):
+        return {"intent": "follow_up", "action": "meaning"}
+
+    if re.search(r"\b(?:another|one more) proverb like (?:this|it)\b", normalized):
+        return {"intent": "follow_up", "action": "another_similar"}
+
+    if re.fullmatch(r"(?:tell|give|show)(?: me)? another (?:one|proverb)[.!?]*", normalized):
+        return {"intent": "follow_up", "action": "another_similar"}
+
     detail_selection = _extract_detail_selection(normalized)
     if detail_selection:
-        return {"intent": "proverb_detail", "selection": detail_selection}
+        return {"intent": "follow_up", "action": "detail", "selection": detail_selection}
 
     list_topic = _extract_proverb_list_topic(normalized)
     if list_topic:
         return {"intent": "proverb_list", "topic": list_topic}
 
     if re.search(r"\b(hi|hello|hey|good morning|good afternoon|good evening)\b", normalized):
-        return "greeting"
+        return "small_talk"
 
     if any(text in plain_compact for text in ["မင်္ဂလာပါ", "ဟယ်လို", "ဟိုင်း"]):
-        return "greeting"
+        return "small_talk"
 
     if re.search(r"\b(who|what)\s+(are|r)\s+(you|u)\b", normalized):
         return "role"
@@ -141,31 +169,51 @@ def _infer_builtin_intent(question: str) -> dict[str, Any] | str | None:
         return "role"
 
     if re.search(r"\btranslate\b.*\b(burmese|myanmar)\b", normalized):
-        return "translate_previous_to_myanmar"
+        return {"intent": "follow_up", "action": "translate_myanmar"}
 
     if any(text in plain_compact for text in ["မြန်မာလို", "မြန်မာလိုပြန်", "ဗမာလို", "ဗမာလိုပြန်"]):
-        return "translate_previous_to_myanmar"
+        return {"intent": "follow_up", "action": "translate_myanmar"}
 
     if re.search(r"\btranslate\b.*\benglish\b", normalized):
-        return "translate_previous_to_english"
+        return {"intent": "follow_up", "action": "english_meaning"}
 
     if any(text in normalized for text in ["english", "in english", "explain in english"]):
-        return "translate_previous_to_english"
+        return {"intent": "follow_up", "action": "english_meaning"}
 
     if re.search(r"\bwhich proverb fits\b", normalized):
-        return "proverb_only"
+        return "proverb_query"
 
     if re.search(r"\b(thanks|thank you|thx|ty)\b", normalized):
-        return "thanks"
+        return "gratitude"
 
     if any(text in plain_compact for text in ["ကျေးဇူး", "ကျေးဇူးတင်ပါတယ်", "ကျေးဇူးပါ"]):
-        return "thanks"
+        return "gratitude"
+
+    # Keep conversational acknowledgements out of semantic proverb search.
+    # Otherwise a message such as "ok" may return an unrelated nearest match.
+    if re.fullmatch(
+        r"(?:ok(?:ay)?|yes|yeah|yep|alright|all right|got it|understood|sure)[.!]*",
+        normalized,
+    ):
+        return "confirmation"
+
+    if plain_compact in {"အိုကေ", "ဟုတ်", "ဟုတ်ကဲ့", "👍", "👌", "😀"}:
+        return "confirmation"
 
     if re.search(r"\b(bye|goodbye|see you|see ya)\b", normalized):
-        return "goodbye"
+        return "farewell"
 
     if any(text in plain_compact for text in ["နောက်မှတွေ့မယ်", "သွားပြီ", "တာ့တာ", "ဘိုင်"]):
-        return "goodbye"
+        return "farewell"
+
+    if re.search(r"\b(?:meaning|mean|explain)\b", normalized):
+        return "meaning_query"
+
+    if re.search(r"\b(?:teacher|teach|lesson)\b", normalized):
+        return "teacher_query"
+
+    if re.search(r"\bcategory\b", normalized):
+        return "category_query"
 
     return None
 
@@ -253,7 +301,7 @@ def _teacher_style_meaning(source: dict[str, Any], language: str = "my") -> str 
     if "ဆရာ့ထက်" in proverb and "တပည့်" in proverb:
         return "ကလေးတို့ရေ၊ တပည့်က ကြိုးစားလို့ ဆရာထက် ပိုတော်လာတဲ့အခါ ဒီစကားပုံကို သုံးတာပါ။"
 
-    return f"ကလေးတို့ရေ၊ ဒီစကားပုံက {meaning} "
+    return f"ကလေးတို့ရေ  {meaning} "
 
 
 def _looks_teacher_styled(meaning: str | None, language: str) -> bool:
@@ -320,6 +368,23 @@ def _thanks_answer(language: str) -> dict[str, Any]:
     return {
         "proverb": None,
         "meaning_simple_mm": "ရပါတယ်ခင်ဗျာ။ အကူအညီပေးခွင့်ရလို့ ဝမ်းသာပါတယ်။",
+        "example_mm": None,
+        "sources": [],
+    }
+
+
+def _acknowledgement_answer(language: str) -> dict[str, Any]:
+    if language == "en":
+        return {
+            "proverb": None,
+            "meaning_simple_mm": "Okay! Ask me anytime if you want another Myanmar proverb or more explanation.",
+            "example_mm": None,
+            "sources": [],
+        }
+
+    return {
+        "proverb": None,
+        "meaning_simple_mm": "ဟုတ်ကဲ့ပါ။ နောက်ထပ် စကားပုံတစ်ခု ဒါမှမဟုတ် အသေးစိတ်ရှင်းပြချက် လိုချင်ရင် မေးနိုင်ပါတယ်။",
         "example_mm": None,
         "sources": [],
     }
@@ -518,13 +583,18 @@ def _proverb_list_answer(sources: list[dict[str, Any]], topic: str, language: st
     heading = (
         f"Here are proverbs related to {topic}:"
         if language == "en"
-        else f"{topic} related proverbs:"
+        else f"{topic} နဲ့ ဆက်စပ်တဲ့ စကားပုံတွေကို ဒီလိုလေး ကြည့်နိုင်ပါတယ်။"
     )
     lines = [heading, *[f"{index}. {item.get('proverb')}" for index, item in enumerate(items, start=1)]]
+    guidance = (
+        "Ask by number if you want me to explain one. For example: 'Explain number 2.'"
+        if language == "en"
+        else "ပိုပြီး အသေးစိတ်သိချင်ရင် နံပါတ်နဲ့ မေးနိုင်ပါတယ်။ ဥပမာ - 'နံပါတ် ၂ ကို ရှင်းပြပါ' လို့ မေးပါ။"
+    )
     return {
         "proverb": None,
         "meaning_simple_mm": "\n".join(lines),
-        "example_mm": "အသေးစိတ်အချက်အလက်များကို သိရှိလိုပါက သက်ဆိုင်ရာ နံပါတ်ကို ဖော်ပြ၍ မေးမြန်းနိုင်ပါသည်။ ဥပမာ - 'နံပါတ် ၂ အား ရှင်းပြပါ'။",
+        "example_mm": guidance,
         "sources": items,
         "intent": "proverb_list",
     }
@@ -538,6 +608,7 @@ def _selected_source_from_previous(previous_answer: dict[str, Any] | None, selec
     if selection == "current":
         if previous_answer.get("proverb"):
             return {
+                **(sources[0] if sources and isinstance(sources[0], dict) else {}),
                 "proverb": previous_answer.get("proverb"),
                 "meaning": previous_answer.get("meaning_simple_mm") or previous_answer.get("meaning"),
                 "example": previous_answer.get("example_mm") or previous_answer.get("example"),
@@ -553,42 +624,92 @@ def _selected_source_from_previous(previous_answer: dict[str, Any] | None, selec
     return sources[index]
 
 
-def rag_answer(user_question: str, previous_answer: dict[str, Any] | None = None) -> dict[str, Any]:
-    return asyncio.run(arag_answer(user_question, previous_answer=previous_answer))
+async def _follow_up_answer(
+    intent_data: dict[str, Any],
+    previous_answer: dict[str, Any] | None,
+    language: str,
+) -> dict[str, Any]:
+    action = str(intent_data.get("action") or "detail")
+    source = _selected_source_from_previous(
+        previous_answer,
+        str(intent_data.get("selection") or "current"),
+    )
+    if not source:
+        return _no_result_answer(language)
+
+    proverb = (source.get("proverb") or "").strip()
+    meaning = (source.get("meaning") or source.get("meaning_simple_mm") or "").strip()
+    example = (source.get("example") or source.get("example_mm") or "").strip()
+    sources = previous_answer.get("sources", []) if previous_answer else []
+
+    if action == "english_meaning":
+        english_meaning = (source.get("english_meaning") or "").strip()
+        return create_guardrailed_answer(proverb, english_meaning or meaning, example, sources)
+
+    if action == "example":
+        message = example or ("No example is stored for this proverb yet." if language == "en" else "ဤစကားပုံအတွက် ဥပမာ မရှိသေးပါ။")
+        return create_guardrailed_answer(proverb, message, example or None, sources)
+
+    return create_guardrailed_answer(
+        proverb,
+        _teacher_style_meaning({"proverb": proverb, "meaning": meaning}, language),
+        example or None,
+        sources,
+    )
 
 
-async def arag_answer(user_question: str, previous_answer: dict[str, Any] | None = None) -> dict[str, Any]:
+def rag_answer(
+    user_question: str,
+    previous_answer: dict[str, Any] | None = None,
+    memory: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return asyncio.run(arag_answer(user_question, previous_answer=previous_answer, memory=memory))
+
+
+async def arag_answer(
+    user_question: str,
+    previous_answer: dict[str, Any] | None = None,
+    memory: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     user_intent = await _aclassify_user_intent(user_question)
     intent = user_intent["intent"]
-    response_language = (
-        "my"
-        if intent == "translate_previous_to_myanmar"
-        else "en"
-        if intent == "translate_previous_to_english"
-        else user_intent["language"]
-    )
+    action = user_intent.get("action")
+    response_language = "my" if action == "translate_myanmar" else "en" if action == "english_meaning" else user_intent["language"]
+    previous_answer = previous_answer or ConversationMemoryService.previous_answer(memory)
+
+    # Conversational intents are resolved before validation and retrieval. This
+    # also permits single-codepoint emoji acknowledgements.
+    if intent == "small_talk":
+        return _greeting_answer(response_language)
+    if intent == "gratitude":
+        return _thanks_answer(response_language)
+    if intent == "confirmation":
+        return _acknowledgement_answer(response_language)
+    if intent == "farewell":
+        return _goodbye_answer(response_language)
+    if intent == "role":
+        return _role_answer(response_language)
 
     is_valid, _error_msg = validate_question(user_question)
     if not is_valid:
         return _no_result_answer(response_language)
 
-    if intent == "translate_previous_to_myanmar" and previous_answer:
-        return _translate_previous_answer(previous_answer, "my")
+    if intent == "follow_up" and action == "another_similar":
+        topic = str((memory or {}).get("last_topic") or "").strip()
+        if not topic:
+            return _no_result_answer(response_language)
+        sources = await aretrieve_context(topic, top_k=max(5, settings.rag_top_k))
+        last_proverb = (previous_answer or {}).get("proverb")
+        alternatives = [item for item in sources if item.get("proverb") != last_proverb]
+        if not alternatives or not is_context_relevant(alternatives):
+            return _no_result_answer(response_language)
+        return _answer_from_best_source(alternatives, response_language)
 
-    if intent == "translate_previous_to_english" and previous_answer:
-        return _translate_previous_answer(previous_answer, "en")
+    if intent == "follow_up":
+        return await _follow_up_answer(user_intent, previous_answer, response_language)
 
-    if intent == "greeting":
-        return _greeting_answer(response_language)
-
-    if intent == "thanks":
-        return _thanks_answer(response_language)
-
-    if intent == "goodbye":
-        return _goodbye_answer(response_language)
-
-    if intent == "role":
-        return _role_answer(response_language)
+    if intent == "generate_image" and previous_answer:
+        return await _follow_up_answer(user_intent, previous_answer, response_language)
 
     if intent == "proverb_list":
         topic = str(user_intent.get("topic") or user_question).strip()
@@ -596,23 +717,6 @@ async def arag_answer(user_question: str, previous_answer: dict[str, Any] | None
         if not sources or not is_context_relevant(sources):
             return _no_result_answer(response_language)
         return _proverb_list_answer(sources, topic, response_language)
-
-    if intent == "proverb_detail":
-        source = _selected_source_from_previous(previous_answer, str(user_intent.get("selection") or "current"))
-        if not source:
-            return _no_result_answer(response_language)
-        return _answer_from_best_source([source], response_language)
-
-    if intent == "proverb_only":
-        sources = await aretrieve_context(user_question, top_k=settings.rag_top_k)
-        if not sources or not is_context_relevant(sources):
-            return _no_result_answer(response_language)
-        best = sources[0]
-        return {
-            "proverb": best.get("proverb"),
-            "meaning_simple_mm": _teacher_style_meaning(best, response_language),
-            "example_mm": best.get("example"),
-        }
 
     try:
         chain_result = await arun_rag_chain(user_question, language=response_language)
@@ -658,3 +762,4 @@ async def arag_answer(user_question: str, previous_answer: dict[str, Any] | None
         example_mm=answer.get("example_mm"),
         sources=answer.get("sources", []),
     )
+

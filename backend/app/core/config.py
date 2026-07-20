@@ -23,11 +23,11 @@ class Settings(BaseSettings):
     jwt_expires_minutes: int = 60 * 24 * 7
 
     ollama_base_url: str = Field(default="http://localhost:11434", validation_alias="OLLAMA_BASE_URL")
-    ollama_model: str = "qwen3:4b"
-    chat_model: str = Field(default="qwen3:4b", validation_alias=AliasChoices("CHAT_MODEL", "OLLAMA_CHAT_MODEL"))
+    ollama_model: str = "qwen3:0.6b"
+    chat_model: str = Field(default="qwen3:0.6b", validation_alias=AliasChoices("CHAT_MODEL", "OLLAMA_CHAT_MODEL"))
     utility_model: str = Field(default="qwen3:0.6b", validation_alias=AliasChoices("UTILITY_MODEL", "OLLAMA_UTILITY_MODEL"))
     ollama_fast_model: str = Field(default="qwen3:0.6b", validation_alias=AliasChoices("UTILITY_MODEL", "OLLAMA_FAST_MODEL"))
-    ollama_complex_model: str = Field(default="qwen3:4b", validation_alias=AliasChoices("CHAT_MODEL", "OLLAMA_COMPLEX_MODEL"))
+    ollama_complex_model: str = Field(default="qwen3:0.6b", validation_alias=AliasChoices("CHAT_MODEL", "OLLAMA_COMPLEX_MODEL"))
     ollama_timeout_seconds: int = Field(default=180, validation_alias=AliasChoices("OLLAMA_TIMEOUT", "OLLAMA_TIMEOUT_SECONDS"))
     utility_temperature: float = Field(default=0.1, validation_alias=AliasChoices("UTILITY_TEMPERATURE", "OLLAMA_UTILITY_TEMPERATURE"))
     utility_num_predict: int = Field(default=128, validation_alias=AliasChoices("UTILITY_NUM_PREDICT", "OLLAMA_UTILITY_NUM_PREDICT"))
@@ -50,11 +50,6 @@ class Settings(BaseSettings):
     metadata_max_concurrent: int = 2
     metadata_max_retries: int = 3
 
-    gemini_api_keys: str = ""
-    gemini_model: str = "gemini-2.0-flash"
-    gemini_timeout_seconds: int = 120
-    gemini_temperature: float = 0.0
-
     chroma_persist_dir: str = "./chroma_data"
     chroma_collection_name: str = "proverbs"
 
@@ -67,17 +62,20 @@ class Settings(BaseSettings):
     rag_min_lexical_similarity: float = 0.5
     rag_semantic_threshold: float = 0.5
 
-    whisper_model: str = "small"
+    whisper_model: str = "base"
     whisper_device: str = "auto"
     whisper_compute_type: str = "auto"
-    whisper_beam_size: int = 1
-    whisper_vad_silence_ms: int = 300
+    whisper_beam_size: int = 5
+    whisper_vad_silence_ms: int = 500
+    whisper_local_files_only: bool = True
     preload_whisper: bool = True
     speech_max_upload_mb: int = 25
     ffmpeg_timeout_seconds: int = 30
     ffmpeg_path: str = "ffmpeg"
-    hf_hub_disable_symlinks_warning: str = "1"
-    hf_token: str = ""
+    edge_tts_myanmar_voice: str = "my-MM-NilarNeural"
+    edge_tts_english_voice: str = "en-US-AriaNeural"
+    edge_tts_rate: str = "+0%"
+    tts_max_characters: int = 3000
 
     admin_email: str = ""
 
@@ -87,9 +85,5 @@ class Settings(BaseSettings):
 
     def allowed_origins_list(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
-
-    def gemini_api_keys_list(self) -> list[str]:
-        return [key.strip() for key in self.gemini_api_keys.split(",") if key.strip()]
-
 
 settings = Settings()

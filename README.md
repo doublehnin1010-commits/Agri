@@ -1,258 +1,105 @@
-# Myanmar Proverbs AI Tutor for Kids (MVP)
+# Myanmar Proverbs Local AI Assistant
 
-Production-ready MVP: **FastAPI + JWT + MongoDB + ChromaDB + Gemini (RAG)** with optional React (Vite) frontend.
+A local-first RAG assistant built with FastAPI, LangChain, ChromaDB, Ollama, and faster-whisper. No AI API key or paid AI service is required.
 
-## Folder structure
+## Architecture
 
-```
-RAG/
-  backend/
-    app/
-      core/
-        config.py
-        security.py
-      db/
-        mongodb.py
-        chroma.py
-      models/
-        user.py
-        chat.py
-      routers/
-        auth.py
-        chat.py
-        import_excel.py
-        history.py
-      services/
-        gemini.py
-        rag.py
-      main.py
-    requirements.txt
-    .env.example
-  frontend/               # optional
-    index.html
-    package.json
-    vite.config.js
-    src/
-      main.jsx
-      api.js
-      App.jsx
-      pages/
-        Login.jsx
-        Chat.jsx
-      styles.css
-  render.yaml             # optional (Render blueprint)
+```text
+Microphone
+   |
+   v
+Browser MediaRecorder
+   |
+   v
+FastAPI /api/v1/speech-to-text
+   |
+   v
+faster-whisper (local STT)
+   |
+   v
+LangChain RAG pipeline
+   |-- ChromaDB
+   |-- OllamaEmbeddings (bge-m3)
+   `-- ChatOllama (qwen3:0.6b)
+   |
+   v
+Generated answer
+   |
+   v
+Edge TTS Myanmar neural voice (optional, internet required)
 ```
 
-## What this app does (RAG in simple words)
+The frontend always records audio and sends it to the local FastAPI endpoint. It does not use the browser's online speech-recognition service. TTS uses Edge TTS through the backend and needs no API key, but it requires internet access and can be muted.
 
-When a user asks a question like “ငါးနဲ့ပတ်သက်တဲ့ စကားပုံ”:
+## Required local services and models
 
-1. We **embed** the user query into a vector (numbers).
-2. We **search ChromaDB** to find the most similar proverb rows from the Excel dataset.
-3. We send those retrieved proverbs as **context** to **Gemini**.
-4. Gemini generates:
-   - the relevant proverb(s)
-   - meaning in **simple Burmese**
-   - an example sentence
-5. We return the answer and also store the conversation in **MongoDB**.
+1. Install and start MongoDB.
+2. Install and start Ollama.
+3. Pull the local models:
 
-## Excel dataset format (example)
+```powershell
+ollama pull qwen3:0.6b
+ollama pull bge-m3
+```
 
-Your `.xlsx` must contain these columns exactly:
+`nomic-embed-text` can replace `bge-m3`, but changing embedding models requires rebuilding the Chroma collection.
 
-| keyword | proverb | meaning | example |
-|---|---|---|---|
-| ငါး | ငါးကြီးက ငါးသေးကို စား | အင်အားကြီးသူက အင်အားနည်းသူကို ဖိအားပေးတတ် | အလုပ်မှာ အကြီးက အငယ်ကို ဖိအားပေးတာ ငါးကြီးက ငါးသေးကို စား လိုပါပဲ |
+4. Install FFmpeg and ensure `ffmpeg` is on `PATH`, or set `FFMPEG_PATH` to the executable.
 
-## Environment variables
+## Backend setup
 
-Copy `backend/.env.example` to `backend/.env` for local dev.
-
-## Run locally (backend)
-
-```bash
+```powershell
+cd backend
 python -m venv .venv
-source .venv/Scripts/activate   # Windows Git Bash
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-
+Copy-Item .env.example .env
 uvicorn app.main:app --reload
 ```
 
-Open docs: `http://127.0.0.1:8000/docs`
+Important local model settings:
 
-## Run locally (frontend - optional)
+```env
+OLLAMA_BASE_URL="http://localhost:11434"
+OLLAMA_MODEL="qwen3:0.6b"
+CHAT_MODEL="qwen3:0.6b"
+UTILITY_MODEL="qwen3:0.6b"
+EMBEDDING_MODEL="bge-m3"
+WHISPER_MODEL="base"
+WHISPER_DEVICE="auto"
+WHISPER_COMPUTE_TYPE="auto"
+WHISPER_BEAM_SIZE=5
+WHISPER_VAD_SILENCE_MS=500
+WHISPER_LOCAL_FILES_ONLY=true
+```
 
-```bash
+The public faster-whisper model is downloaded automatically on first use and then loaded from the local cache. No token or login is configured by this project. For a network-isolated deployment, populate the model cache during installation before disconnecting the machine.
+
+Backend API documentation is available at `http://127.0.0.1:8000/docs`.
+
+## Frontend setup
+
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
 
-Set `VITE_API_BASE_URL` in `frontend/.env` (example: `http://127.0.0.1:8000`).
+Set `VITE_API_URL=http://127.0.0.1:8000` in `frontend/.env` when needed. Microphone capture requires localhost or a secure HTTPS context.
 
-## API overview
+## Main endpoints
 
-- `POST /register`
-- `POST /login`
-- `POST /import-excel` (JWT required)
-- `POST /chat` (JWT required)
-- `GET /history` (JWT required)
+- `POST /api/v1/speech-to-text` - local faster-whisper transcription
+- `POST /api/v1/chat` - local RAG answer generation
+- `POST /api/v1/import-excel` - import dataset rows
+- `POST /api/v1/reindex` - rebuild the Chroma index
+- `GET /health` - backend health check
 
-## API examples
+## Local-first boundary
 
-### Register
-
-**Request**
-
-```json
-{
-  "email": "kidparent@example.com",
-  "password": "StrongPass123",
-  "name": "Parent"
-}
-```
-
-**Response**
-
-```json
-{
-  "id": "665f...ab",
-  "email": "kidparent@example.com",
-  "name": "Parent"
-}
-```
-
-### Login
-
-**Request**
-
-```json
-{
-  "email": "kidparent@example.com",
-  "password": "StrongPass123"
-}
-```
-
-**Response**
-
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "bearer"
-}
-```
-
-### Import Excel (upload)
-
-`POST /import-excel` with `multipart/form-data`
-
-- form field: `file` = your `.xlsx`
-- header: `Authorization: Bearer <token>`
-
-**Response**
-
-```json
-{
-  "inserted": 1200,
-  "skipped": 0,
-  "collection": "proverbs"
-}
-```
-
-### Chat (RAG)
-
-**Request**
-
-```json
-{
-  "message": "ငါးနဲ့ပတ်သက်တဲ့ စကားပုံ"
-}
-```
-
-**Response**
-
-```json
-{
-  "answer": {
-    "proverb": "....",
-    "meaning_simple_mm": "....",
-    "example_mm": "....",
-    "sources": [
-      {
-        "keyword": "ငါး",
-        "proverb": "....",
-        "meaning": "....",
-        "example": "....",
-        "score": 0.12
-      }
-    ]
-  }
-}
-```
-
-## Deployment (Render + MongoDB Atlas)
-
-### 1) MongoDB Atlas setup
-
-- Create a free cluster in MongoDB Atlas.
-- Create a database user (username/password).
-- Add IP allowlist:
-  - For MVP: allow `0.0.0.0/0` (later restrict).
-- Copy your connection string, e.g.:
-  - `mongodb+srv://USER:PASS@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority`
-
-### 2) Get a Gemini API key
-
-- In Google AI Studio, create an API key.
-- Keep it for `GEMINI_API_KEY`.
-
-### 3) Push to GitHub
-
-```bash
-git init
-git add .
-git commit -m "MVP: Myanmar Proverbs AI Tutor (RAG)"
-git branch -M main
-git remote add origin <your-repo>
-git push -u origin main
-```
-
-### 4) Deploy on Render (recommended)
-
-Option A (Blueprint):
-- In Render, click **New +** → **Blueprint**
-- Connect your GitHub repo
-- Render will read `render.yaml`
-
-Option B (Manual Web Service):
-- Create a **Web Service**
-- Root directory: `backend`
-- Build command:
-  - `pip install -r requirements.txt`
-- Start command:
-  - `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-
-### 5) Set environment variables on Render
-
-Set these (same as `.env.example`):
-
-- `MONGODB_URI`
-- `MONGODB_DB_NAME`
-- `JWT_SECRET_KEY`
-- `JWT_EXPIRES_MINUTES`
-- `GEMINI_API_KEY`
-- `GEMINI_MODEL`
-- `GEMINI_EMBED_MODEL`
-- `CHROMA_PERSIST_DIR`
-- `CHROMA_COLLECTION_NAME`
-- `RAG_TOP_K`
-
-### 6) Production health check
-
-After deploy, open:
-- `https://<your-render-service>/docs`
-
-## Notes
-
-- ChromaDB persistence is local to the Render instance. For an MVP this is OK; for production scaling you’d move vectors to a managed vector DB or use Render persistent disk.
-
+- LLM generation goes only to the configured local Ollama URL.
+- Embeddings go only to the configured local Ollama URL.
+- Vector data is persisted in local ChromaDB storage.
+- Speech transcription runs in the backend with faster-whisper.
+- No cloud AI keys or authentication variables are required.
+- Optional TTS uses Edge TTS with `my-MM-NilarNeural` by default; it requires internet but no API key.

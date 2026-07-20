@@ -78,8 +78,18 @@ def generate_chat_response(prompt: str, *, system_instruction: str | None = None
     return invoke_text(prompt, system_instruction=instruction, model=settings.chat_model)
 
 
-def generate_utility_response(prompt: str, *, system_instruction: str | None = None) -> str:
-    return invoke_text(prompt, system_instruction=system_instruction, model=settings.utility_model)
+def generate_utility_response(
+    prompt: str,
+    *,
+    system_instruction: str | None = None,
+    reasoning: bool | None = None,
+) -> str:
+    return invoke_text(
+        prompt,
+        system_instruction=system_instruction,
+        model=settings.utility_model,
+        reasoning=reasoning,
+    )
 
 
 async def agenerate_chat_response(prompt: str, *, system_instruction: str | None = None) -> str:
@@ -91,7 +101,13 @@ async def agenerate_utility_response(prompt: str, *, system_instruction: str | N
     return await ainvoke_text(prompt, system_instruction=system_instruction, model=settings.utility_model)
 
 
-def invoke_text(prompt: str, *, system_instruction: str | None = None, model: str | None = None) -> str:
+def invoke_text(
+    prompt: str,
+    *,
+    system_instruction: str | None = None,
+    model: str | None = None,
+    reasoning: bool | None = None,
+) -> str:
     """Invoke ChatOllama and return plain text."""
 
     messages: list[SystemMessage | HumanMessage] = []
@@ -101,7 +117,8 @@ def invoke_text(prompt: str, *, system_instruction: str | None = None, model: st
 
     selected_model = (model or settings.utility_model).strip()
     started_at = time.perf_counter()
-    response = get_llm(selected_model).invoke(messages)
+    invoke_options = {"reasoning": reasoning} if reasoning is not None else {}
+    response = get_llm(selected_model).invoke(messages, **invoke_options)
     return _response_text(response, selected_model, started_at)
 
 

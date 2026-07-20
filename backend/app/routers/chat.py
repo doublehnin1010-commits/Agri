@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends
 from app.db.mongodb import get_db
 from app.models.chat import ChatRequest, ChatResponse
 from app.core.deps import get_current_user_id
-from app.services.rag import arag_answer
+from app.services.conversation_memory import ConversationMemoryService
+from app.services.rag import arag_answer, classify_user_intent
 
 
 router = APIRouter()
@@ -21,6 +22,29 @@ def _message(role: str, content: str, created_at: datetime, answer: dict | None 
     if answer is not None:
         item["answer"] = answer
     return item
+
+
+def _answer_to_text(answer: dict | None) -> str:
+    if not isinstance(answer, dict):
+        return ""
+    proverb = _clean_text(answer.get("proverb"))
+    meaning = _clean_text(answer.get("meaning_simple_mm")) or _clean_text(answer.get("meaning"))
+    example = _clean_text(answer.get("example_mm")) or _clean_text(answer.get("example"))
+    if answer.get("intent") == "proverb_list":
+        return "\n\n".join(part for part in (meaning, example) if part)
+    if not proverb:
+        return "\n\n".join(part for part in (meaning, example) if part)
+
+    parts = [
+        f"ဒီစကားပုံလေးကို ကြည့်ရအောင်။\n\n“{proverb}”" if proverb else None,
+        f"ဒီစကားပုံက {meaning}" if meaning else None,
+        f"ဥပမာပြောရရင် {example}" if example else None,
+    ]
+    return "\n\n".join(part for part in parts if part)
+
+
+def _clean_text(value: object) -> str | None:
+    return value.strip() if isinstance(value, str) and value.strip() else None
 
 
 def _title_from_message(message: str, limit: int = 40) -> str:
@@ -49,26 +73,24 @@ async def chat(payload: ChatRequest, user_id: str = Depends(get_current_user_id)
     if object_id is not None:
         conversation = await history.find_one({"_id": object_id, "user_id": user_id})
 
-    previous_answer = None
-    if conversation:
-        messages = conversation.get("messages") or []
-        for item in reversed(messages):
-            if item.get("role") == "assistant":
-                previous_answer = item.get("answer")
-                break
-        if previous_answer is None:
-            previous_answer = conversation.get("assistant_message")
-
-    answer = await arag_answer(payload.message, previous_answer=previous_answer)
+    memory = ConversationMemoryService.load(conversation)
+    previous_answer = ConversationMemoryService.previous_answer(memory)
+    intent_data = await classify_user_intent(payload.message)
+    answer = await arag_answer(
+        payload.message,
+        previous_answer=previous_answer,
+        memory=memory,
+    )
+    updated_memory = ConversationMemoryService.update(
+        memory,
+        str(intent_data["intent"]),
+        answer,
+        topic=intent_data.get("topic"),
+        user_message=payload.message,
+    )
 
     user_message = _message("user", payload.message, now)
-    assistant_message = _message("assistant", "", now, answer)
-    assistant_message["content"] = (
-        answer.get("meaning_simple_mm")
-        or answer.get("meaning")
-        or answer.get("proverb")
-        or ""
-    )
+    assistant_message = _message("assistant", _answer_to_text(answer), now, answer)
 
     if conversation:
         existing_messages = conversation.get("messages")
@@ -82,18 +104,14 @@ async def chat(payload: ChatRequest, user_id: str = Depends(get_current_user_id)
                     conversation.get("assistant_message"),
                 ),
             ]
-            existing_messages[-1]["content"] = (
-                (conversation.get("assistant_message") or {}).get("meaning_simple_mm")
-                or (conversation.get("assistant_message") or {}).get("meaning")
-                or (conversation.get("assistant_message") or {}).get("proverb")
-                or ""
-            )
+            existing_messages[-1]["content"] = _answer_to_text(conversation.get("assistant_message"))
 
         await history.update_one(
             {"_id": conversation["_id"], "user_id": user_id},
             {
                 "$set": {
                     "messages": [*existing_messages, user_message, assistant_message],
+                    "memory": updated_memory,
                     "updated_at": now,
                 }
             },
@@ -108,6 +126,7 @@ async def chat(payload: ChatRequest, user_id: str = Depends(get_current_user_id)
                 "user_id": user_id,
                 "title": title,
                 "messages": [user_message, assistant_message],
+                "memory": updated_memory,
                 "created_at": now,
                 "updated_at": now,
             }
