@@ -1,17 +1,20 @@
 import { Mic, MicOff, RotateCcw, Volume2, VolumeX, X } from "lucide-react";
 import type { VoiceConversationStatus } from "../hooks/useVoiceConversation";
+import type { SpeechRecognitionLanguage } from "../types/speech";
 
 interface VoiceButtonProps {
   isVoiceMode: boolean;
   status: VoiceConversationStatus;
   isMuted: boolean;
   canReplay: boolean;
+  language: SpeechRecognitionLanguage;
   disabled?: boolean;
   onToggleVoiceMode: () => void;
   onToggleMute: () => void;
   onReplay: () => void;
   onStopSpeaking: () => void;
   onExit: () => void;
+  onLanguageChange: (language: SpeechRecognitionLanguage) => void;
 }
 
 export function VoiceButton({
@@ -19,22 +22,52 @@ export function VoiceButton({
   status,
   isMuted,
   canReplay,
+  language,
   disabled = false,
   onToggleVoiceMode,
   onToggleMute,
   onReplay,
   onStopSpeaking,
   onExit,
+  onLanguageChange,
 }: VoiceButtonProps) {
   const isSpeaking = status === "speaking";
+  const isActiveMobile = isVoiceMode ? "hidden sm:inline-flex" : "inline-flex";
 
   return (
-    <div className="flex shrink-0 items-center gap-1.5">
+    <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+      <div
+        className={`${isActiveMobile} h-10 items-center rounded-lg border border-slate-200 bg-slate-50 p-1`}
+        role="group"
+        aria-label="Voice input language"
+      >
+        {(["my-MM", "en-US"] as const).map((option) => {
+          const selected = language === option;
+          const label = option === "my-MM" ? "မြန်မာ" : "EN";
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onLanguageChange(option)}
+              disabled={isVoiceMode}
+              className={`h-8 rounded-md px-2 text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-brand-300 disabled:cursor-not-allowed ${
+                selected
+                  ? "bg-white text-brand-700 shadow-sm ring-1 ring-slate-200"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+              aria-pressed={selected}
+              title={isVoiceMode ? "Exit voice mode to change language" : `Use ${label} voice input`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
       <button
         type="button"
         onClick={onToggleVoiceMode}
         disabled={disabled && !isVoiceMode}
-        className={`relative inline-flex h-11 w-11 items-center justify-center rounded-lg border transition focus:outline-none focus:ring-4 disabled:cursor-not-allowed disabled:opacity-50 sm:h-12 sm:w-12 ${
+        className={`relative inline-flex h-10 w-10 items-center justify-center rounded-lg border transition focus:outline-none focus:ring-4 disabled:cursor-not-allowed disabled:opacity-50 ${
           isVoiceMode
             ? "border-red-300 bg-red-50 text-red-600 focus:ring-red-100"
             : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus:ring-brand-100"
@@ -58,7 +91,7 @@ export function VoiceButton({
           <button
             type="button"
             onClick={onToggleMute}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 sm:h-12 sm:w-12"
+            className="hidden h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 sm:inline-flex"
             aria-label={isMuted ? "Unmute AI voice" : "Mute AI voice"}
             aria-pressed={isMuted}
             title={isMuted ? "Unmute AI voice" : "Mute AI voice"}
@@ -69,7 +102,7 @@ export function VoiceButton({
             type="button"
             onClick={isSpeaking ? onStopSpeaking : onReplay}
             disabled={!isSpeaking && !canReplay}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 disabled:cursor-not-allowed disabled:opacity-50 sm:h-12 sm:w-12"
+            className="hidden h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 disabled:cursor-not-allowed disabled:opacity-50 sm:inline-flex"
             aria-label={isSpeaking ? "Stop speaking" : "Replay last response"}
             title={isSpeaking ? "Stop speaking" : "Replay last response"}
           >
@@ -78,7 +111,7 @@ export function VoiceButton({
           <button
             type="button"
             onClick={onExit}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 sm:h-12 sm:w-12"
+            className="hidden h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 sm:inline-flex"
             aria-label="Exit voice mode"
             title="Exit voice mode"
           >

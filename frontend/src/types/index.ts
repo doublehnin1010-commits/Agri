@@ -28,19 +28,26 @@ export interface LoginPayload {
 }
 
 export interface SourceItem {
+  id?: string | null;
   keyword?: string | null;
+  category?: string | null;
   proverb?: string | null;
   meaning?: string | null;
+  english_meaning?: string | null;
   example?: string | null;
   score?: number | null;
 }
 
 export interface AiAnswer {
+  proverb_id?: string | null;
   proverb?: string | null;
   meaning_simple_mm?: string | null;
   meaning?: string | null;
   example_mm?: string | null;
   example?: string | null;
+  language?: "my" | "en" | string | null;
+  image_url?: string | null;
+  image_prompt?: string | null;
   sources?: SourceItem[];
   [key: string]: unknown;
 }
@@ -69,10 +76,71 @@ export interface Conversation {
 export interface Proverb {
   id: string;
   keyword?: string | null;
+  category?: string | null;
   proverb: string;
   meaning?: string | null;
   english_meaning?: string | null;
   example?: string | null;
+}
+
+export interface FavoriteStatus {
+  message?: string | null;
+  favorite: boolean;
+}
+
+export interface FavoriteProverb extends Proverb {
+  created_at: string;
+}
+
+export type QuizDifficulty = "easy" | "medium" | "hard";
+
+export type QuizQuestionType =
+  | "multiple_choice"
+  | "meaning_identification"
+  | "situation_matching"
+  | "fill_in_the_blank";
+
+export interface QuizStartPayload {
+  category?: string;
+  difficulty?: QuizDifficulty;
+  question_count: number;
+}
+
+export interface QuizQuestion {
+  id: number;
+  type: QuizQuestionType;
+  proverb: string;
+  question: string;
+  options: string[];
+}
+
+export interface QuizStartResponse {
+  quiz_id: string;
+  questions: QuizQuestion[];
+}
+
+export interface QuizSubmitPayload {
+  quiz_id: string;
+  answers: Array<{
+    question_id: number;
+    selected: number;
+  }>;
+}
+
+export interface QuizResultItem {
+  question_id: number;
+  correct: boolean;
+  correct_answer: number;
+  selected?: number | null;
+  explanation: string;
+}
+
+export interface QuizSubmitResponse {
+  score: number;
+  total: number;
+  percentage: number;
+  results: QuizResultItem[];
+  recommended_proverbs: Proverb[];
 }
 
 export interface ImportResult {

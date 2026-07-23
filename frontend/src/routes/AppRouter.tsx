@@ -6,8 +6,10 @@ import { AdminDashboardPage } from "../pages/admin/AdminDashboardPage";
 import { ImportDatasetPage } from "../pages/admin/ImportDatasetPage";
 import { ProverbsManagementPage } from "../pages/admin/ProverbsManagementPage";
 import { ChatPage } from "../pages/ChatPage";
+import { FavoritesPage } from "../pages/FavoritesPage";
 import { HistoryPage } from "../pages/HistoryPage";
 import { LoginPage } from "../pages/LoginPage";
+import { QuizPage } from "../pages/QuizPage";
 import { RegisterPage } from "../pages/RegisterPage";
 import { ProtectedRoute } from "./ProtectedRoute";
 
@@ -24,6 +26,8 @@ export function AppRouter() {
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<ChatPage />} />
             <Route path="/history" element={<HistoryPage />} />
+            <Route path="/favorites" element={<FavoritesPage />} />
+            <Route path="/quiz" element={<QuizPage />} />
           </Route>
         </Route>
 

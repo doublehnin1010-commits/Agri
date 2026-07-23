@@ -8,20 +8,23 @@ interface HistoryGroupProps {
   onSelect: (conversation: HistoryConversation) => void;
   onRename?: (conversation: HistoryConversation) => void;
   onDelete?: (conversation: HistoryConversation) => void;
+  variant?: "light" | "dark";
 }
 
-export function HistoryGroup({ label, conversations, activeId, onSelect, onRename, onDelete }: HistoryGroupProps) {
+export function HistoryGroup({ label, conversations, activeId, onSelect, onRename, onDelete, variant = "light" }: HistoryGroupProps) {
   if (!conversations.length) return null;
+  const labelClass = variant === "dark" ? "text-slate-500" : "text-slate-400";
 
   return (
     <section className="space-y-1">
-      <h2 className="px-3 pt-4 text-xs font-bold uppercase tracking-wide text-slate-400">{label}</h2>
+      <h2 className={`px-3 pt-4 text-xs font-bold uppercase tracking-wide ${labelClass}`}>{label}</h2>
       <div className="space-y-0.5">
         {conversations.map((conversation) => (
           <HistoryItem
             key={conversation.id}
             conversation={conversation}
             active={conversation.id === activeId}
+            variant={variant}
             onClick={onSelect}
             onRename={onRename}
             onDelete={onDelete}

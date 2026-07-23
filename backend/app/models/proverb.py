@@ -20,6 +20,7 @@ class ProverbUpdate(BaseModel):
 class ProverbResponse(BaseModel):
     id: str
     keyword: str | None = None
+    category: str | None = None
     proverb: str
     meaning: str | None = None
     english_meaning: str | None = None

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { getApiErrorMessage } from "../api/client";
 import { fetchHistory } from "../services/historyService";
+import type { AiAnswer } from "../types";
 import type { HistoryConversation, HistoryMessage } from "../types/history";
 import { getConversationTitle } from "../utils/history";
 
@@ -14,6 +15,7 @@ interface HistoryState {
   selectConversation: (conversation: HistoryConversation) => void;
   startNewConversation: () => void;
   appendMessage: (message: HistoryMessage) => void;
+  updateMessageAnswer: (messageId: string, answer: AiAnswer) => void;
   persistCurrentConversation: (conversation: Pick<HistoryConversation, "id" | "title" | "created_at">) => void;
   renameConversation: (conversationId: string, title: string) => void;
   removeConversation: (conversationId: string) => void;
@@ -85,6 +87,29 @@ export const useHistory = create<HistoryState>((set, get) => ({
     };
     nextConversation.title = getConversationTitle(nextConversation);
     set({ currentConversation: nextConversation });
+  },
+
+  updateMessageAnswer: (messageId, answer) => {
+    set((state) => {
+      const current = state.currentConversation;
+      if (!current) return state;
+
+      const nextCurrentConversation: HistoryConversation = {
+        ...current,
+        messages: current.messages.map((message) =>
+          message.id === messageId
+            ? { ...message, answer, content: message.content }
+            : message,
+        ),
+      };
+
+      return {
+        currentConversation: nextCurrentConversation,
+        conversationList: state.conversationList.map((conversation) =>
+          conversation.id === nextCurrentConversation.id ? nextCurrentConversation : conversation,
+        ),
+      };
+    });
   },
 
   persistCurrentConversation: (conversation) => {

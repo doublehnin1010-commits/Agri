@@ -60,7 +60,8 @@ function normalizeConversation(item: HistoryConversation | LegacyHistoryItem, in
 }
 
 function normalizeMessage(message: HistoryMessage): HistoryMessage {
-  const content = message.content || answerToText(message.answer as AiAnswer | undefined);
+  const answerText = answerToText(message.answer as AiAnswer | undefined);
+  const content = message.role === "assistant" && answerText ? answerText : message.content || answerText;
   return {
     ...message,
     id: message.id ?? makeId(`history-${message.role}`),

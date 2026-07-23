@@ -14,11 +14,9 @@ export async function transcribeAudio(
   formData.append("file", audio, filename);
   formData.append("language", language);
 
-  const { data } = await apiClient.post<TranscribeResponse>("/transcribe", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
+  // Let the browser add the multipart boundary. Setting Content-Type manually
+  // breaks uploads in some browser/axios combinations.
+  const { data } = await apiClient.post<TranscribeResponse>("/transcribe", formData);
 
   return data.transcript;
 }
