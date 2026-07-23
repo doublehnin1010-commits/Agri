@@ -1,4 +1,3 @@
-import { useSpeechRecognition } from "./useSpeechRecognition";
 import { useAudioRecording } from "./useAudioRecording";
 import type { SpeechRecognitionLanguage, SpeechRecognitionStatus, VoiceInputMode } from "../types/speech";
 import { getVoiceInputMode, isVoiceInputSupported } from "../utils/voiceCapability";
@@ -38,8 +37,6 @@ export function useVoiceInput(options: UseVoiceInputOptions): UseVoiceInputResul
   const mode = getVoiceInputMode();
   const isSupported = isVoiceInputSupported();
 
-  const speech = useSpeechRecognition(options);
-
   const audio = useAudioRecording({
     language: options.language,
     onTranscript: options.onTranscript,
@@ -48,20 +45,6 @@ export function useVoiceInput(options: UseVoiceInputOptions): UseVoiceInputResul
 
   if (!isSupported) {
     return { ...idleVoiceInput, mode, language: options.language };
-  }
-
-  if (mode === "speech-api") {
-    return {
-      mode,
-      isSupported: true,
-      status: speech.status,
-      isListening: speech.isListening,
-      language: speech.language,
-      setLanguage: speech.setLanguage,
-      startListening: speech.startListening,
-      stopListening: speech.stopListening,
-      toggleListening: speech.toggleListening,
-    };
   }
 
   return {

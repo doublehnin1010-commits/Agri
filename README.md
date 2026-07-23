@@ -1,258 +1,409 @@
-# Myanmar Proverbs AI Tutor for Kids (MVP)
+# Burmese Proverbs Hub
 
-Production-ready MVP: **FastAPI + JWT + MongoDB + ChromaDB + Gemini (RAG)** with optional React (Vite) frontend.
+Burmese Proverbs Hub is a full-stack RAG application for learning, searching, explaining, quizzing, and saving Myanmar traditional proverbs. It combines a FastAPI backend, ChromaDB vector search, MongoDB user data, Ollama local models, and a React + TypeScript frontend.
 
-## Folder structure
+## Features
 
+- User authentication with JWT
+- Admin dataset management
+- DOCX dataset import and ChromaDB indexing
+- RAG chat for Myanmar proverb questions
+- Dataset-only proverb answers with source grounding
+- English and Myanmar explanation support
+- Voice input with backend speech-to-text
+- Optional text-to-speech playback
+- Chat history stored in MongoDB
+- AI Quiz Mode from the indexed proverb dataset
+- Favorite Proverbs with per-user MongoDB storage
+- Favorites page with detail modal
+- Responsive React + Tailwind UI
+
+## Tech Stack
+
+Backend:
+
+- FastAPI
+- MongoDB with Motor
+- ChromaDB
+- LangChain
+- Ollama
+- Gemini for speech-to-text and optional chat fallback
+- Edge TTS
+
+Frontend:
+
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+- React Query
+- Zustand
+- Axios
+- Lucide icons
+
+## Project Structure
+
+```text
+D:\RAG
+|-- backend
+|   |-- app
+|   |   |-- core
+|   |   |-- db
+|   |   |-- models
+|   |   |-- routers
+|   |   |-- services
+|   |   `-- main.py
+|   |-- chroma_data
+|   |-- requirements.txt
+|   `-- .env.example
+|-- frontend
+|   |-- src
+|   |   |-- api
+|   |   |-- components
+|   |   |-- contexts
+|   |   |-- hooks
+|   |   |-- layouts
+|   |   |-- pages
+|   |   |-- routes
+|   |   |-- services
+|   |   `-- types
+|   `-- package.json
+`-- README.md
 ```
-RAG/
-  backend/
-    app/
-      core/
-        config.py
-        security.py
-      db/
-        mongodb.py
-        chroma.py
-      models/
-        user.py
-        chat.py
-      routers/
-        auth.py
-        chat.py
-        import_excel.py
-        history.py
-      services/
-        gemini.py
-        rag.py
-      main.py
-    requirements.txt
-    .env.example
-  frontend/               # optional
-    index.html
-    package.json
-    vite.config.js
-    src/
-      main.jsx
-      api.js
-      App.jsx
-      pages/
-        Login.jsx
-        Chat.jsx
-      styles.css
-  render.yaml             # optional (Render blueprint)
+
+## Prerequisites
+
+Install these before running the project:
+
+- Python 3.11+
+- Node.js 20+
+- MongoDB
+- Ollama
+- FFmpeg
+
+Pull the local Ollama models:
+
+```powershell
+ollama pull qwen3:0.6b
+ollama pull bge-m3
 ```
 
-## What this app does (RAG in simple words)
+`bge-m3` is used for embeddings. If you change the embedding model, rebuild the ChromaDB index.
 
-When a user asks a question like “ငါးနဲ့ပတ်သက်တဲ့ စကားပုံ”:
+## Backend Setup
 
-1. We **embed** the user query into a vector (numbers).
-2. We **search ChromaDB** to find the most similar proverb rows from the Excel dataset.
-3. We send those retrieved proverbs as **context** to **Gemini**.
-4. Gemini generates:
-   - the relevant proverb(s)
-   - meaning in **simple Burmese**
-   - an example sentence
-5. We return the answer and also store the conversation in **MongoDB**.
-
-## Excel dataset format (example)
-
-Your `.xlsx` must contain these columns exactly:
-
-| keyword | proverb | meaning | example |
-|---|---|---|---|
-| ငါး | ငါးကြီးက ငါးသေးကို စား | အင်အားကြီးသူက အင်အားနည်းသူကို ဖိအားပေးတတ် | အလုပ်မှာ အကြီးက အငယ်ကို ဖိအားပေးတာ ငါးကြီးက ငါးသေးကို စား လိုပါပဲ |
-
-## Environment variables
-
-Copy `backend/.env.example` to `backend/.env` for local dev.
-
-## Run locally (backend)
-
-```bash
+```powershell
+cd backend
 python -m venv .venv
-source .venv/Scripts/activate   # Windows Git Bash
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+Copy-Item .env.example .env
+```
 
+Edit `backend/.env`:
+
+```env
+MONGODB_URI="mongodb://localhost:27017"
+MONGODB_DB_NAME="mm_proverbs_ai"
+JWT_SECRET_KEY="change-this-secret"
+
+OLLAMA_BASE_URL="http://localhost:11434"
+CHAT_PROVIDER="ollama"
+CHAT_MODEL="qwen3:0.6b"
+UTILITY_MODEL="qwen3:0.6b"
+EMBEDDING_MODEL="bge-m3"
+
+GEMINI_API_KEY=""
+FFMPEG_PATH="ffmpeg"
+ADMIN_EMAIL="admin@example.com"
+```
+
+Start the backend:
+
+```powershell
 uvicorn app.main:app --reload
 ```
 
-Open docs: `http://127.0.0.1:8000/docs`
+Backend docs:
 
-## Run locally (frontend - optional)
+```text
+http://127.0.0.1:8000/docs
+```
 
-```bash
+Health check:
+
+```text
+GET http://127.0.0.1:8000/health
+```
+
+## Frontend Setup
+
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
 
-Set `VITE_API_BASE_URL` in `frontend/.env` (example: `http://127.0.0.1:8000`).
+The frontend runs at:
 
-## API overview
+```text
+https://127.0.0.1:5173
+```
 
-- `POST /register`
-- `POST /login`
-- `POST /import-excel` (JWT required)
-- `POST /chat` (JWT required)
-- `GET /history` (JWT required)
+If needed, create `frontend/.env`:
 
-## API examples
+```env
+VITE_API_URL=http://127.0.0.1:8000
+```
 
-### Register
+The API client automatically appends `/api/v1`.
 
-**Request**
+## Authentication
+
+Users can register and log in from the frontend.
+
+Main auth APIs:
+
+```text
+POST /api/v1/register
+POST /api/v1/login
+```
+
+JWT tokens are sent with:
+
+```text
+Authorization: Bearer <token>
+```
+
+Admin-only routes are protected by role-based middleware.
+
+## Dataset and RAG
+
+The proverb dataset is stored in ChromaDB with metadata such as:
+
+- proverb
+- meaning
+- english_meaning
+- keyword
+- category
+- example
+
+The RAG pipeline uses:
+
+- semantic retrieval from ChromaDB
+- lexical fallback search
+- metadata awareness
+- query rewrite support when enabled
+- dataset-only guardrails
+
+The assistant should not invent new proverbs. Proverbs and meanings must come from the indexed dataset.
+
+## Main Backend APIs
+
+Chat:
+
+```text
+POST /api/v1/chat
+```
+
+History:
+
+```text
+GET /api/v1/history
+PATCH /api/v1/history/{conversation_id}
+DELETE /api/v1/history/{conversation_id}
+```
+
+Proverbs:
+
+```text
+GET /api/v1/proverbs
+POST /api/v1/proverbs
+PUT /api/v1/proverbs/{proverb_id}
+DELETE /api/v1/proverbs/{proverb_id}
+DELETE /api/v1/proverbs
+```
+
+Import and reindex:
+
+```text
+POST /api/v1/import-docx
+GET /api/v1/import-docx/status/{job_id}
+POST /api/v1/reindex
+```
+
+Voice:
+
+```text
+POST /api/v1/speech-to-text
+POST /api/v1/transcribe
+POST /api/v1/speech
+```
+
+Quiz:
+
+```text
+POST /api/v1/quiz/start
+POST /api/v1/quiz/submit
+```
+
+Favorites:
+
+```text
+POST /api/v1/favorites/{proverb_id}
+DELETE /api/v1/favorites/{proverb_id}
+GET /api/v1/favorites
+GET /api/v1/favorites/check/{proverb_id}
+```
+
+## AI Quiz Mode
+
+Quiz Mode lets users practice meanings from the dataset.
+
+Frontend route:
+
+```text
+/quiz
+```
+
+Start quiz request:
 
 ```json
 {
-  "email": "kidparent@example.com",
-  "password": "StrongPass123",
-  "name": "Parent"
+  "difficulty": "easy",
+  "question_count": 5
 }
 ```
 
-**Response**
+Quiz questions are generated quickly from the indexed dataset. The system uses dataset meanings as correct answers and other dataset meanings as distractors.
+
+Submit quiz request:
 
 ```json
 {
-  "id": "665f...ab",
-  "email": "kidparent@example.com",
-  "name": "Parent"
+  "quiz_id": "...",
+  "answers": [
+    {
+      "question_id": 1,
+      "selected": 2
+    }
+  ]
 }
 ```
 
-### Login
+The result screen shows:
 
-**Request**
+- final score
+- percentage
+- correct answers
+- wrong answers
+- review cards
 
-```json
-{
-  "email": "kidparent@example.com",
-  "password": "StrongPass123"
-}
+## Favorite Proverbs
+
+Users can save proverbs to their personal favorites.
+
+Frontend route:
+
+```text
+/favorites
 ```
 
-**Response**
+Favorites are stored in MongoDB as references only:
 
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "bearer"
-}
+- user_id
+- proverb_id
+- created_at
+
+The app does not duplicate proverb data. The favorites page hydrates proverb details from the existing ChromaDB collection.
+
+Favorite features:
+
+- Favorite button on proverb answer cards
+- Favorite button on related proverb cards
+- Favorites page
+- Empty state with `Explore Proverbs`
+- Detail modal for each favorite
+- Remove favorite button
+
+## Voice Features
+
+The frontend records audio through the browser and sends it to the backend.
+
+Backend flow:
+
+```text
+Browser MediaRecorder
+  -> FastAPI upload endpoint
+  -> FFmpeg preprocessing
+  -> Gemini speech-to-text
+  -> RAG chat
+  -> optional Edge TTS
 ```
 
-### Import Excel (upload)
+FFmpeg must be installed and available on `PATH`, or configured with:
 
-`POST /import-excel` with `multipart/form-data`
-
-- form field: `file` = your `.xlsx`
-- header: `Authorization: Bearer <token>`
-
-**Response**
-
-```json
-{
-  "inserted": 1200,
-  "skipped": 0,
-  "collection": "proverbs"
-}
+```env
+FFMPEG_PATH="C:\\ffmpeg\\bin\\ffmpeg.exe"
 ```
 
-### Chat (RAG)
+## Frontend Pages
 
-**Request**
+User pages:
 
-```json
-{
-  "message": "ငါးနဲ့ပတ်သက်တဲ့ စကားပုံ"
-}
+```text
+/dashboard   Main chat and proverb assistant
+/history     Chat history
+/quiz        Quiz mode
+/favorites   Saved favorite proverbs
 ```
 
-**Response**
+Auth pages:
 
-```json
-{
-  "answer": {
-    "proverb": "....",
-    "meaning_simple_mm": "....",
-    "example_mm": "....",
-    "sources": [
-      {
-        "keyword": "ငါး",
-        "proverb": "....",
-        "meaning": "....",
-        "example": "....",
-        "score": 0.12
-      }
-    ]
-  }
-}
+```text
+/login
+/register
 ```
 
-## Deployment (Render + MongoDB Atlas)
+Admin pages:
 
-### 1) MongoDB Atlas setup
-
-- Create a free cluster in MongoDB Atlas.
-- Create a database user (username/password).
-- Add IP allowlist:
-  - For MVP: allow `0.0.0.0/0` (later restrict).
-- Copy your connection string, e.g.:
-  - `mongodb+srv://USER:PASS@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority`
-
-### 2) Get a Gemini API key
-
-- In Google AI Studio, create an API key.
-- Keep it for `GEMINI_API_KEY`.
-
-### 3) Push to GitHub
-
-```bash
-git init
-git add .
-git commit -m "MVP: Myanmar Proverbs AI Tutor (RAG)"
-git branch -M main
-git remote add origin <your-repo>
-git push -u origin main
+```text
+/admin
+/admin/import
+/admin/proverbs
 ```
 
-### 4) Deploy on Render (recommended)
+## Development Commands
 
-Option A (Blueprint):
-- In Render, click **New +** → **Blueprint**
-- Connect your GitHub repo
-- Render will read `render.yaml`
+Backend compile check:
 
-Option B (Manual Web Service):
-- Create a **Web Service**
-- Root directory: `backend`
-- Build command:
-  - `pip install -r requirements.txt`
-- Start command:
-  - `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+```powershell
+python -m compileall backend/app
+```
 
-### 5) Set environment variables on Render
+Frontend build:
 
-Set these (same as `.env.example`):
+```powershell
+cd frontend
+npm run build
+```
 
-- `MONGODB_URI`
-- `MONGODB_DB_NAME`
-- `JWT_SECRET_KEY`
-- `JWT_EXPIRES_MINUTES`
-- `GEMINI_API_KEY`
-- `GEMINI_MODEL`
-- `GEMINI_EMBED_MODEL`
-- `CHROMA_PERSIST_DIR`
-- `CHROMA_COLLECTION_NAME`
-- `RAG_TOP_K`
+Frontend dev server:
 
-### 6) Production health check
-
-After deploy, open:
-- `https://<your-render-service>/docs`
+```powershell
+cd frontend
+npm run dev -- --host 127.0.0.1 --port 5173
+```
 
 ## Notes
 
-- ChromaDB persistence is local to the Render instance. For an MVP this is OK; for production scaling you’d move vectors to a managed vector DB or use Render persistent disk.
+- MongoDB must be running before backend startup.
+- Ollama must be running before using chat, embeddings, or reindex features.
+- Gemini API key is required for Gemini speech-to-text.
+- Edge TTS requires internet access.
+- If ChromaDB embedding dimensions mismatch, rebuild the dataset index.
+- New favorite buttons require proverb ids in answer payloads, so older saved chat messages may not show favorite controls.
 
+## License
+
+This project is for educational use and Myanmar proverb preservation.

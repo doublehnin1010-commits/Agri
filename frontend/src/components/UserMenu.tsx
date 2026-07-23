@@ -18,7 +18,7 @@ export function UserMenu() {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+        className="flex min-w-0 items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
       >
         <UserRound className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span className="hidden max-w-36 truncate sm:block">{user?.email}</span>

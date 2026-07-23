@@ -11,7 +11,9 @@ from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 
 from app.core.config import settings
 from app.services.llm_service import (
+    agenerate_chat_response,
     agenerate_utility_response,
+    generate_chat_response,
     generate_utility_response,
     get_llm,
     get_chat_llm,
@@ -144,14 +146,18 @@ Do not answer the user's question.
 """.strip()
 
 DATASET_ONLY_SYSTEM_INSTRUCTION = """
-You are a Myanmar Proverbs Tutor for children.
+You are Burmese Proverbs Hub, a Myanmar Proverbs Educational Assistant.
 
 Strict rules:
-1. Use ONLY the retrieved dataset context provided in the user message.
-2. Never use outside knowledge, general facts, programming, science, history, politics, or other topics.
-3. Never guess, invent, or create proverbs, meanings, or examples.
-4. If the context is empty or not relevant, return the standard not-found response exactly as instructed.
-5. Stay focused on Myanmar proverbs only.
+1. Your ONLY knowledge source is the retrieved Myanmar Proverbs dataset context.
+2. All Myanmar proverbs, meanings, explanations, and lessons MUST come ONLY from the provided dataset.
+3. Do not use Gemini's own knowledge about Myanmar proverbs.
+4. Do not generate new proverbs. Do not guess missing meanings. Do not modify existing proverbs.
+5. Gemini is only responsible for explaining and presenting retrieved information clearly.
+6. If the requested proverb or information cannot be found in the provided dataset, return this exact Myanmar sentence:
+ဝမ်းနည်းပါတယ်။ ကျွန်ုပ်၏ စကားပုံဒေတာအတွင်း မတွေ့ရှိပါ။
+7. This chatbot is designed only for Myanmar traditional proverbs.
+8. Explain like a teacher teaching a student. Use simple Myanmar language.
 """.strip()
 
 ANSWER_PROMPT_EN = ChatPromptTemplate.from_messages(
@@ -225,8 +231,12 @@ Answer in Burmese only, using JSON with these fields:
 )
 
 FAST_DATASET_ONLY_SYSTEM_INSTRUCTION = """
-You are a Myanmar Proverbs Tutor.
-Use only the provided context. Do not invent proverbs or meanings.
+You are Burmese Proverbs Hub, a Myanmar Proverbs Educational Assistant.
+Use only the provided Myanmar Proverbs dataset context.
+Gemini explains. Dataset provides knowledge. Never reverse this relationship.
+Do not use outside knowledge. Do not invent proverbs or meanings. Do not modify existing proverbs.
+If no relevant context exists, return null for proverb and the exact not-found message:
+ဝမ်းနည်းပါတယ်။ ကျွန်ုပ်၏ စကားပုံဒေတာအတွင်း မတွေ့ရှိပါ။
 Return JSON only. If context is empty or irrelevant, set proverb to null.
 """.strip()
 
@@ -263,8 +273,13 @@ ANSWER_PROMPT_MY = ChatPromptTemplate.from_messages(
 
 Question: {question}
 
-Answer in Burmese. Pick the best context item only. Use 1-2 short teacher-friendly sentences.
-meaning_simple_mm must start with "ကလေးတို့ရေ" or "ဆိုလိုတာက".
+Answer in simple Burmese. Pick the best context item only.
+meaning_simple_mm must contain three labeled sections exactly:
+အဓိပ္ပါယ်:
+သင်ခန်းစာ:
+ဥပမာ:
+The meaning and lesson must be based only on the selected context item's meaning.
+The example must be based on the selected context item's meaning or stored example.
 Return exactly this JSON:
 {{
   "proverb": "...",
@@ -338,6 +353,45 @@ def _get_answer_chain(language: str, model: str | None = None):
     return _answer_chains[key]
 
 
+def _render_answer_prompt(language: str, *, context: str, question: str) -> tuple[str | None, str]:
+    messages = _select_answer_prompt(language).format_messages(context=context, question=question)
+    system_parts: list[str] = []
+    human_parts: list[str] = []
+    for message in messages:
+        content = str(message.content)
+        if getattr(message, "type", "") == "system":
+            system_parts.append(content)
+        else:
+            human_parts.append(content)
+    system_instruction = "\n\n".join(system_parts).strip() or None
+    prompt = "\n\n".join(human_parts).strip()
+    return system_instruction, prompt
+
+
+def _generate_answer_text(language: str, *, context: str, question: str, model: str) -> str:
+    if settings.chat_provider.strip().lower() == "gemini":
+        system_instruction, prompt = _render_answer_prompt(language, context=context, question=question)
+        return generate_chat_response(prompt, system_instruction=system_instruction)
+    return _get_answer_chain(language, model).invoke(
+        {
+            "context": context,
+            "question": question,
+        }
+    )
+
+
+async def _agenerate_answer_text(language: str, *, context: str, question: str, model: str) -> str:
+    if settings.chat_provider.strip().lower() == "gemini":
+        system_instruction, prompt = _render_answer_prompt(language, context=context, question=question)
+        return await agenerate_chat_response(prompt, system_instruction=system_instruction)
+    return await _get_answer_chain(language, model).ainvoke(
+        {
+            "context": context,
+            "question": question,
+        }
+    )
+
+
 def _build_rag_chain():
     retriever = get_retriever()
 
@@ -355,11 +409,11 @@ def _build_rag_chain():
 
     def _run_generation(inputs: dict[str, Any]) -> dict[str, Any]:
         model = select_chat_model(inputs["question"], language=inputs["language"])
-        text = _get_answer_chain(inputs["language"], model).invoke(
-            {
-                "context": inputs["context"],
-                "question": inputs["question"],
-            }
+        text = _generate_answer_text(
+            inputs["language"],
+            context=inputs["context"],
+            question=inputs["question"],
+            model=model,
         )
         return {
             "sources": inputs["sources"],
@@ -393,11 +447,11 @@ async def arun_rag_chain(question: str, language: str = "my") -> dict[str, Any]:
 
     generation_start = time.perf_counter()
     model = select_chat_model(question, language=language)
-    text = await _get_answer_chain(language, model).ainvoke(
-        {
-            "context": _format_sources_as_context(sources),
-            "question": question,
-        }
+    text = await _agenerate_answer_text(
+        language,
+        context=_format_sources_as_context(sources),
+        question=question,
+        model=model,
     )
     generation_ms = _elapsed_ms(generation_start)
     logger.info(

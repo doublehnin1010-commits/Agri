@@ -15,20 +15,20 @@ export function AppLayout() {
   }, [navigate]);
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-cream">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="sticky top-0 z-20 flex  h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4  py-5 backdrop-blur">
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-slate-800 bg-slate-900 px-4 text-white sm:px-6">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
+            className="rounded-lg p-2 text-slate-200 hover:bg-slate-800 lg:hidden"
             aria-label="Open sidebar"
           >
             <Menu className="h-5 w-5" aria-hidden="true" />
           </button>
-          <div className="hidden text-sm font-semibold text-slate-500 lg:block">User Dashboard</div>
-          <UserMenu />
+          <div className="hidden text-sm font-semibold text-slate-300 lg:block">Dashboard</div>
+          <div className="[&_button]:text-slate-200 [&_button:hover]:bg-slate-800 [&_button:hover]:text-white"><UserMenu /></div>
         </header>
         <Outlet />
       </div>

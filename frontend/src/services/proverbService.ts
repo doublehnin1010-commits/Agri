@@ -16,8 +16,22 @@ function normalizeProverbs(data: unknown): Proverb[] {
 }
 
 export async function listProverbs(): Promise<Proverb[]> {
-  const { data } = await apiClient.get<unknown>("/proverbs");
-  return normalizeProverbs(data);
+  const batchSize = 5000;
+  const proverbs: Proverb[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data } = await apiClient.get<unknown>("/proverbs", {
+      params: { limit: batchSize, offset },
+    });
+    const batch = normalizeProverbs(data);
+    proverbs.push(...batch);
+
+    if (batch.length < batchSize) break;
+    offset += batch.length;
+  }
+
+  return proverbs;
 }
 
 export async function createProverb(payload: ProverbPayload): Promise<Proverb> {
