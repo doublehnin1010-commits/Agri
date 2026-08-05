@@ -1,34 +1,24 @@
 import { BookOpenText, Bot, GraduationCap, Lightbulb, MessageSquareText, UserRound } from "lucide-react";
 import type { ChatMessage } from "../types";
+import { getAnswerLabels, getAnswerSections, looksEnglish } from "../utils/answer";
 import { FavoriteButton } from "./FavoriteButton";
 
 interface ChatBubbleProps {
   message: ChatMessage;
 }
 
-interface AnswerSections {
-  proverb: string | null;
-  meaning: string | null;
-  lesson: string | null;
-  example: string | null;
-}
-
-const SECTION_PATTERN = /(?:^|\n)\s*(စကားပုံ|အဓိပ္ပါယ်|သင်ခန်းစာ|ဥပမာ|Proverb|Meaning|Lesson|Example)\s*[:：]\s*/g;
-
 export function ChatBubble({ message }: ChatBubbleProps) {
   const isUser = message.role === "user";
-  const answerProverb = cleanText(message.answer?.proverb);
   const rawMeaning = cleanText(message.answer?.meaning_simple_mm) ?? cleanText(message.answer?.meaning);
-  const answerExample = cleanText(message.answer?.example_mm) ?? cleanText(message.answer?.example);
-  const sections = parseAnswerSections(rawMeaning);
-  const proverb = answerProverb ?? sections.proverb;
+  const sections = getAnswerSections(message.answer);
+  const proverb = sections.proverb;
   const proverbId =
     cleanText(message.answer?.proverb_id) ??
     cleanText(message.answer?.sources?.find((source) => cleanText(source.proverb) === proverb)?.id) ??
     cleanText(message.answer?.sources?.[0]?.id);
-  const example = sections.example ?? answerExample;
   const isProverbList = message.answer?.intent === "proverb_list";
   const isEnglish = message.answer?.language === "en" || looksEnglish(rawMeaning);
+  const labels = getAnswerLabels(isEnglish);
   const hasStructuredAnswer = !isUser && Boolean(proverb);
 
   return (
@@ -73,27 +63,27 @@ export function ChatBubble({ message }: ChatBubbleProps) {
             ) : rawMeaning ? (
               <p className="whitespace-pre-wrap text-[15px] leading-8">{rawMeaning}</p>
             ) : null}
-            {answerExample ? <p className="whitespace-pre-wrap text-[15px] leading-8 text-slate-600">{answerExample}</p> : null}
+            {sections.example ? <p className="whitespace-pre-wrap text-[15px] leading-8 text-slate-600">{sections.example}</p> : null}
           </div>
         ) : hasStructuredAnswer ? (
           <article>
             <header className="flex flex-col gap-3 border-b border-cream-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex min-w-0 items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white">
-                <BookOpenText className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-brand-700">{isEnglish ? "Proverb" : "စကားပုံ"}</p>
-                <h3 className="mt-1 break-words text-lg font-bold leading-8 text-slate-950">{proverb}</h3>
-              </div>
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white">
+                  <BookOpenText className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-brand-700">{labels.proverb}</p>
+                  <h3 className="mt-1 break-words text-lg font-bold leading-8 text-slate-950">{proverb}</h3>
+                </div>
               </div>
               {proverbId ? <FavoriteButton proverbId={proverbId} compact /> : null}
             </header>
 
             <div className="divide-y divide-cream-200">
-              <AnswerSection icon={MessageSquareText} label={isEnglish ? "Meaning" : "အဓိပ္ပါယ်"} text={sections.meaning} />
-              <AnswerSection icon={Lightbulb} label={isEnglish ? "Lesson" : "သင်ခန်းစာ"} text={sections.lesson} />
-              <AnswerSection icon={GraduationCap} label={isEnglish ? "Example" : "ဥပမာ"} text={example} />
+              <AnswerSection icon={MessageSquareText} label={labels.meaning} text={sections.meaning} />
+              <AnswerSection icon={Lightbulb} label={labels.lesson} text={sections.lesson} />
+              <AnswerSection icon={GraduationCap} label={labels.example} text={sections.example} />
             </div>
           </article>
         ) : (
@@ -132,39 +122,6 @@ function AnswerSection({
   );
 }
 
-function parseAnswerSections(text: string | null): AnswerSections {
-  const result: AnswerSections = { proverb: null, meaning: null, lesson: null, example: null };
-  if (!text) return result;
-
-  const matches = [...text.matchAll(SECTION_PATTERN)];
-  if (!matches.length) {
-    result.meaning = text;
-    return result;
-  }
-
-  for (let index = 0; index < matches.length; index += 1) {
-    const match = matches[index];
-    const label = match[1];
-    const start = (match.index ?? 0) + match[0].length;
-    const end = matches[index + 1]?.index ?? text.length;
-    const value = cleanText(text.slice(start, end));
-
-    if (label === "စကားပုံ" || label === "Proverb") result.proverb = value;
-    if (label === "အဓိပ္ပါယ်" || label === "Meaning") result.meaning = value;
-    if (label === "သင်ခန်းစာ" || label === "Lesson") result.lesson = value;
-    if (label === "ဥပမာ" || label === "Example") result.example = value;
-  }
-
-  return result;
-}
-
 function cleanText(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function looksEnglish(value: string | null): boolean {
-  if (!value) return false;
-  const latin = (value.match(/[A-Za-z]/g) ?? []).length;
-  const myanmar = (value.match(/[\u1000-\u109F]/g) ?? []).length;
-  return latin > 0 && latin >= myanmar;
 }
