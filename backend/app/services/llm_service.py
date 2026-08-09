@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import http.client
 import json
 import logging
 import re
@@ -229,6 +230,10 @@ def _invoke_gemini_text(prompt: str, *, system_instruction: str | None = None) -
                     break
                 except urllib.error.URLError as exc:
                     errors.append(f"model {model_index}/{len(models)} key {key_index}/{len(api_keys)} network error: {getattr(exc, 'reason', exc)}")
+                    _cooldown_gemini_key(api_key, 30.0)
+                    break
+                except http.client.RemoteDisconnected as exc:
+                    errors.append(f"model {model_index}/{len(models)} key {key_index}/{len(api_keys)} network error: {exc}")
                     _cooldown_gemini_key(api_key, 30.0)
                     break
                 except TimeoutError:

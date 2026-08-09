@@ -1,4 +1,5 @@
 import asyncio
+import http.client
 from unittest.mock import AsyncMock, patch
 
 from app.services.conversation_memory import ConversationMemoryService
@@ -247,6 +248,46 @@ def test_topic_list_respects_requested_count_and_keeps_dataset_meaning():
     asyncio.run(run())
 
 
+def test_topic_request_for_one_proverb_returns_detail_sections():
+    sources = [
+        {
+            "proverb": "Mistake proverb",
+            "meaning": "A person should learn from a mistake and avoid repeating it.",
+            "example": "",
+        }
+    ]
+
+    async def run():
+        with (
+            patch(
+                "app.services.rag._aclassify_user_intent",
+                new_callable=AsyncMock,
+                return_value={
+                    "intent": "proverb_list",
+                    "language": "my",
+                    "topic": "mistakes",
+                    "requested_count": 1,
+                },
+            ),
+            patch("app.services.rag.settings.chat_provider", "ollama"),
+            patch("app.services.rag.is_context_relevant", return_value=True),
+            patch("app.services.rag.aretrieve_context", new_callable=AsyncMock, return_value=sources) as retrieve,
+            patch("app.services.rag.arun_rag_chain", new_callable=AsyncMock) as chain,
+        ):
+            answer = await arag_answer("အမှားကနေသင်ခန်းစာယူတဲ့စကားပုံ တစ်ခု")
+
+            assert answer["proverb"] == "Mistake proverb"
+            assert answer.get("intent") != "proverb_list"
+            assert "အဓိပ္ပါယ်:\nA person should learn from a mistake and avoid repeating it." in answer["meaning_simple_mm"]
+            assert "သင်ခန်းစာ:\n" in answer["meaning_simple_mm"]
+            assert "ဥပမာ:\n" in answer["meaning_simple_mm"]
+            retrieve.assert_awaited_once()
+            assert retrieve.await_args.args[0] == "mistakes"
+            chain.assert_not_awaited()
+
+    asyncio.run(run())
+
+
 def test_topic_list_reports_when_fewer_than_requested_are_available():
     sources = [
         {
@@ -375,20 +416,109 @@ def test_gemini_detail_keeps_dataset_proverb_and_meaning_exact():
 
     async def run():
         with (
+            patch(
+                "app.services.rag._aclassify_user_intent",
+                new_callable=AsyncMock,
+                return_value={"intent": "follow_up", "language": "my", "action": "detail", "selection": "current"},
+            ),
             patch("app.services.rag.settings.chat_provider", "gemini"),
+            patch("app.services.rag.settings.fast_response_mode", False),
             patch(
                 "app.services.rag.agenerate_chat_response",
                 new_callable=AsyncMock,
                 return_value='{"lesson_mm":"Generated lesson only.","example_mm":"Generated example only."}',
             ),
         ):
-            answer = await arag_answer("Explain this proverb", previous_answer={"sources": sources})
+            answer = await arag_answer("ဒီစကားပုံကို ရှင်းပြပါ", previous_answer={"sources": sources})
 
             assert answer["proverb"] == "Exact dataset proverb"
             assert "စကားပုံ:\nExact dataset proverb" in answer["meaning_simple_mm"]
             assert "အဓိပ္ပါယ်:\nExact dataset meaning must not be rewritten." in answer["meaning_simple_mm"]
             assert "သင်ခန်းစာ:\nGenerated lesson only." in answer["meaning_simple_mm"]
             assert "ဥပမာ:\nGenerated example only." in answer["meaning_simple_mm"]
+
+    asyncio.run(run())
+
+
+def test_gemini_detail_uses_gemini_for_lesson_and_example():
+    sources = [
+        {
+            "proverb": "Gemini proverb",
+            "meaning": "Gemini exact meaning.",
+            "example": "",
+        }
+    ]
+
+    async def run():
+        with (
+            patch(
+                "app.services.rag._aclassify_user_intent",
+                new_callable=AsyncMock,
+                return_value={"intent": "follow_up", "language": "my", "action": "detail", "selection": "current"},
+            ),
+            patch("app.services.rag.settings.chat_provider", "gemini"),
+            patch("app.services.rag.settings.fast_response_mode", True),
+            patch(
+                "app.services.rag.agenerate_chat_response",
+                new_callable=AsyncMock,
+                return_value='{"lesson_mm":"Gemini generated lesson.","example_mm":"Gemini generated example."}',
+            ) as generate,
+        ):
+            answer = await arag_answer("ဒီစကားပုံကို ရှင်းပြပါ", previous_answer={"sources": sources})
+
+            assert answer["proverb"] == "Gemini proverb"
+            assert "အဓိပ္ပါယ်:\nGemini exact meaning." in answer["meaning_simple_mm"]
+            assert "သင်ခန်းစာ:\nGemini generated lesson." in answer["meaning_simple_mm"]
+            assert "ဥပမာ:\nGemini generated example." in answer["meaning_simple_mm"]
+            generate.assert_awaited_once()
+
+    asyncio.run(run())
+
+
+def test_gemini_query_keeps_dataset_meaning_and_generates_lesson_example():
+    sources = [
+        {
+            "proverb": "Gemini retrieved proverb",
+            "meaning": "Exact dataset meaning.",
+            "example": "",
+        }
+    ]
+
+    async def run():
+        with (
+            patch(
+                "app.services.rag._aclassify_user_intent",
+                new_callable=AsyncMock,
+                return_value={"intent": "proverb_query", "language": "my"},
+            ),
+            patch("app.services.rag.settings.chat_provider", "gemini"),
+            patch("app.services.rag.settings.fast_response_mode", True),
+            patch("app.services.rag.is_context_relevant", return_value=True),
+            patch(
+                "app.services.rag.arun_rag_chain",
+                new_callable=AsyncMock,
+                return_value={
+                    "text": '{"proverb":"Gemini retrieved proverb","meaning_simple_mm":"Gemini rewritten meaning that must not be used.","example_mm":"Gemini chain example."}',
+                    "sources": sources,
+                },
+            ) as chain,
+            patch("app.services.rag.aretrieve_context", new_callable=AsyncMock) as retrieve,
+            patch(
+                "app.services.rag.agenerate_chat_response",
+                new_callable=AsyncMock,
+                return_value='{"lesson_mm":"Gemini generated lesson.","example_mm":"Gemini generated example."}',
+            ) as generate,
+        ):
+            answer = await arag_answer("အမှားကနေသင်ခန်းစာယူတဲ့စကားပုံ")
+
+            assert answer["proverb"] == "Gemini retrieved proverb"
+            assert "အဓိပ္ပါယ်:\nExact dataset meaning." in answer["meaning_simple_mm"]
+            assert "Gemini rewritten meaning that must not be used." not in answer["meaning_simple_mm"]
+            assert "သင်ခန်းစာ:\nGemini generated lesson." in answer["meaning_simple_mm"]
+            assert "ဥပမာ:\nGemini generated example." in answer["meaning_simple_mm"]
+            chain.assert_awaited_once()
+            retrieve.assert_not_awaited()
+            generate.assert_awaited_once()
 
     asyncio.run(run())
 
@@ -404,14 +534,20 @@ def test_gemini_failure_still_returns_useful_lesson():
 
     async def run():
         with (
+            patch(
+                "app.services.rag._aclassify_user_intent",
+                new_callable=AsyncMock,
+                return_value={"intent": "follow_up", "language": "my", "action": "detail", "selection": "current"},
+            ),
             patch("app.services.rag.settings.chat_provider", "gemini"),
+            patch("app.services.rag.settings.fast_response_mode", False),
             patch(
                 "app.services.rag.agenerate_chat_response",
                 new_callable=AsyncMock,
                 side_effect=RuntimeError("Gemini failed"),
             ),
         ):
-            answer = await arag_answer("Explain this proverb", previous_answer={"sources": sources})
+            answer = await arag_answer("ဒီစကားပုံကို ရှင်းပြပါ", previous_answer={"sources": sources})
 
             assert "အဓိပ္ပါယ်:\nExact dataset meaning must stay exact." in answer["meaning_simple_mm"]
             assert "အခြေခံပြီး လူတစ်ယောက်အနေနဲ့" not in answer["meaning_simple_mm"]
@@ -419,6 +555,39 @@ def test_gemini_failure_still_returns_useful_lesson():
             assert "ခဏနောက်မှ" not in answer["meaning_simple_mm"]
             assert "သင်ခန်းစာ:\n" in answer["meaning_simple_mm"]
             assert "နေ့စဉ်ဘဝ" in answer["meaning_simple_mm"]
+
+    asyncio.run(run())
+
+
+def test_gemini_remote_disconnect_still_returns_useful_lesson():
+    sources = [
+        {
+            "proverb": "Exact dataset proverb",
+            "meaning": "Exact dataset meaning must stay exact.",
+            "example": "",
+        }
+    ]
+
+    async def run():
+        with (
+            patch(
+                "app.services.rag._aclassify_user_intent",
+                new_callable=AsyncMock,
+                return_value={"intent": "follow_up", "language": "my", "action": "detail", "selection": "current"},
+            ),
+            patch("app.services.rag.settings.chat_provider", "gemini"),
+            patch("app.services.rag.settings.fast_response_mode", False),
+            patch(
+                "app.services.rag.agenerate_chat_response",
+                new_callable=AsyncMock,
+                side_effect=http.client.RemoteDisconnected("Remote end closed connection without response"),
+            ),
+        ):
+            answer = await arag_answer("ဒီစကားပုံကို ရှင်းပြပါ", previous_answer={"sources": sources})
+
+            assert "အဓိပ္ပါယ်:\nExact dataset meaning must stay exact." in answer["meaning_simple_mm"]
+            assert "သင်ခန်းစာ:\n" in answer["meaning_simple_mm"]
+            assert "ဥပမာ:\n" in answer["meaning_simple_mm"]
 
     asyncio.run(run())
 

@@ -2,6 +2,7 @@ import { Copy, Download, FileImage, Image as ImageIcon, Loader2, X } from "lucid
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import type { AiAnswer, SourceItem } from "../types";
+import { getAnswerSections } from "../utils/answer";
 import {
   blobToObjectUrl,
   copyBlobToClipboard,
@@ -20,6 +21,8 @@ type ExportContent =
       type: "single";
       proverb: string;
       meaning?: string;
+      lesson?: string;
+      example?: string;
       englishMeaning?: string;
     }
   | {
@@ -257,6 +260,8 @@ function SingleProverbContent({ content }: { content: Extract<ExportContent, { t
         {content.proverb}
       </div>
       {content.meaning ? <TextSection title="Meaning" text={content.meaning} /> : null}
+      {content.lesson ? <TextSection title="Lesson" text={content.lesson} /> : null}
+      {content.example ? <TextSection title="Example" text={content.example} /> : null}
       {content.englishMeaning ? <TextSection title="English Meaning" text={content.englishMeaning} /> : null}
     </div>
   );
@@ -319,12 +324,15 @@ function TextSection({ title, text }: { title: string; text: string }) {
 }
 
 function getExportContent(answer: AiAnswer): ExportContent {
-  const proverb = cleanText(answer.proverb);
+  const sections = getAnswerSections(answer);
+  const proverb = cleanText(sections.proverb);
   if (proverb) {
     return {
       type: "single",
       proverb,
-      meaning: cleanText(answer.meaning_simple_mm) ?? cleanText(answer.meaning),
+      meaning: cleanText(sections.meaning),
+      lesson: cleanText(sections.lesson),
+      example: cleanText(sections.example),
       englishMeaning: cleanText(answer.english_meaning) ?? cleanText(answer.sources?.[0]?.english_meaning),
     };
   }
