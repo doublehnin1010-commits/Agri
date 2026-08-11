@@ -25,3 +25,4 @@ frontend/vite*.log
 node_modules/
 dist/
 backend/models/
+backend/models/
