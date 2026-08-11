@@ -7,8 +7,8 @@ export function Brand() {
         <GraduationCap className="h-5 w-5" aria-hidden="true" />
       </div>
       <div className="min-w-0">
-        <p className="truncate text-sm font-bold text-slate-950">Myanmar Proverbs</p>
-        <p className="truncate text-xs font-medium text-slate-500">AI Tutor</p>
+        <p className="truncate text-sm font-bold text-slate-100">Burmese Proverbs Hub</p>
+        <p className="truncate text-xs font-medium text-slate-500">Educational AI</p>
       </div>
     </div>
   );

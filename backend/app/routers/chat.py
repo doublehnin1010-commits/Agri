@@ -35,11 +35,9 @@ def _answer_to_text(answer: dict | None) -> str:
     if not proverb:
         return "\n\n".join(part for part in (meaning, example) if part)
 
-    parts = [
-        f"ဒီစကားပုံလေးကို ကြည့်ရအောင်။\n\n“{proverb}”" if proverb else None,
-        f"ဒီစကားပုံက {meaning}" if meaning else None,
-        f"ဥပမာပြောရရင် {example}" if example else None,
-    ]
+    parts = [f"စကားပုံ:\n{proverb}", meaning]
+    if example and (not meaning or "ဥပမာ:" not in meaning):
+        parts.append(f"ဥပမာ:\n{example}")
     return "\n\n".join(part for part in parts if part)
 
 

@@ -1,52 +1,96 @@
-# Myanmar Proverbs Local AI Assistant
+# Burmese Proverbs Hub
 
-A local-first RAG assistant built with FastAPI, LangChain, ChromaDB, Ollama, and faster-whisper. No AI API key or paid AI service is required.
+Burmese Proverbs Hub is a full-stack RAG application for learning, searching, explaining, quizzing, and saving Myanmar traditional proverbs. It combines a FastAPI backend, ChromaDB vector search, MongoDB user data, Ollama local models, and a React + TypeScript frontend.
 
-## Architecture
+## Features
+
+- User authentication with JWT
+- Admin dataset management
+- DOCX dataset import and ChromaDB indexing
+- RAG chat for Myanmar proverb questions
+- Dataset-only proverb answers with source grounding
+- English and Myanmar explanation support
+- Voice input with backend speech-to-text
+- Optional text-to-speech playback
+- Chat history stored in MongoDB
+- AI Quiz Mode from the indexed proverb dataset
+- Favorite Proverbs with per-user MongoDB storage
+- Favorites page with detail modal
+- Responsive React + Tailwind UI
+
+## Tech Stack
+
+Backend:
+
+- FastAPI
+- MongoDB with Motor
+- ChromaDB
+- LangChain
+- Ollama
+- Gemini for speech-to-text and optional chat fallback
+- Edge TTS
+
+Frontend:
+
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+- React Query
+- Zustand
+- Axios
+- Lucide icons
+
+## Project Structure
 
 ```text
-Microphone
-   |
-   v
-Browser MediaRecorder
-   |
-   v
-FastAPI /api/v1/speech-to-text
-   |
-   v
-faster-whisper (local STT)
-   |
-   v
-LangChain RAG pipeline
-   |-- ChromaDB
-   |-- OllamaEmbeddings (bge-m3)
-   `-- ChatOllama (qwen3:0.6b)
-   |
-   v
-Generated answer
-   |
-   v
-Edge TTS Myanmar neural voice (optional, internet required)
+D:\RAG
+|-- backend
+|   |-- app
+|   |   |-- core
+|   |   |-- db
+|   |   |-- models
+|   |   |-- routers
+|   |   |-- services
+|   |   `-- main.py
+|   |-- chroma_data
+|   |-- requirements.txt
+|   `-- .env.example
+|-- frontend
+|   |-- src
+|   |   |-- api
+|   |   |-- components
+|   |   |-- contexts
+|   |   |-- hooks
+|   |   |-- layouts
+|   |   |-- pages
+|   |   |-- routes
+|   |   |-- services
+|   |   `-- types
+|   `-- package.json
+`-- README.md
 ```
 
-The frontend always records audio and sends it to the local FastAPI endpoint. It does not use the browser's online speech-recognition service. TTS uses Edge TTS through the backend and needs no API key, but it requires internet access and can be muted.
+## Prerequisites
 
-## Required local services and models
+Install these before running the project:
 
-1. Install and start MongoDB.
-2. Install and start Ollama.
-3. Pull the local models:
+- Python 3.11+
+- Node.js 20+
+- MongoDB
+- Ollama
+- FFmpeg
+
+Pull the local Ollama models:
 
 ```powershell
 ollama pull qwen3:0.6b
 ollama pull bge-m3
 ```
 
-`nomic-embed-text` can replace `bge-m3`, but changing embedding models requires rebuilding the Chroma collection.
+`bge-m3` is used for embeddings. If you change the embedding model, rebuild the ChromaDB index.
 
-4. Install FFmpeg and ensure `ffmpeg` is on `PATH`, or set `FFMPEG_PATH` to the executable.
-
-## Backend setup
+## Backend Setup
 
 ```powershell
 cd backend
@@ -54,30 +98,45 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 Copy-Item .env.example .env
-uvicorn app.main:app --reload
 ```
 
-Important local model settings:
+Edit `backend/.env`:
 
 ```env
+MONGODB_URI="mongodb://localhost:27017"
+MONGODB_DB_NAME="mm_proverbs_ai"
+JWT_SECRET_KEY="change-this-secret"
+
 OLLAMA_BASE_URL="http://localhost:11434"
-OLLAMA_MODEL="qwen3:0.6b"
+CHAT_PROVIDER="ollama"
 CHAT_MODEL="qwen3:0.6b"
 UTILITY_MODEL="qwen3:0.6b"
 EMBEDDING_MODEL="bge-m3"
-WHISPER_MODEL="base"
-WHISPER_DEVICE="auto"
-WHISPER_COMPUTE_TYPE="auto"
-WHISPER_BEAM_SIZE=5
-WHISPER_VAD_SILENCE_MS=500
-WHISPER_LOCAL_FILES_ONLY=true
+
+GEMINI_API_KEY=""
+FFMPEG_PATH="ffmpeg"
+ADMIN_EMAIL="admin@example.com"
 ```
 
-The public faster-whisper model is downloaded automatically on first use and then loaded from the local cache. No token or login is configured by this project. For a network-isolated deployment, populate the model cache during installation before disconnecting the machine.
+Start the backend:
 
-Backend API documentation is available at `http://127.0.0.1:8000/docs`.
+```powershell
+uvicorn app.main:app --reload
+```
 
-## Frontend setup
+Backend docs:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+Health check:
+
+```text
+GET http://127.0.0.1:8000/health
+```
+
+## Frontend Setup
 
 ```powershell
 cd frontend
@@ -85,21 +144,266 @@ npm install
 npm run dev
 ```
 
-Set `VITE_API_URL=http://127.0.0.1:8000` in `frontend/.env` when needed. Microphone capture requires localhost or a secure HTTPS context.
+The frontend runs at:
 
-## Main endpoints
+```text
+https://127.0.0.1:5173
+```
 
-- `POST /api/v1/speech-to-text` - local faster-whisper transcription
-- `POST /api/v1/chat` - local RAG answer generation
-- `POST /api/v1/import-excel` - import dataset rows
-- `POST /api/v1/reindex` - rebuild the Chroma index
-- `GET /health` - backend health check
+If needed, create `frontend/.env`:
 
-## Local-first boundary
+```env
+VITE_API_URL=http://127.0.0.1:8000
+```
 
-- LLM generation goes only to the configured local Ollama URL.
-- Embeddings go only to the configured local Ollama URL.
-- Vector data is persisted in local ChromaDB storage.
-- Speech transcription runs in the backend with faster-whisper.
-- No cloud AI keys or authentication variables are required.
-- Optional TTS uses Edge TTS with `my-MM-NilarNeural` by default; it requires internet but no API key.
+The API client automatically appends `/api/v1`.
+
+## Authentication
+
+Users can register and log in from the frontend.
+
+Main auth APIs:
+
+```text
+POST /api/v1/register
+POST /api/v1/login
+```
+
+JWT tokens are sent with:
+
+```text
+Authorization: Bearer <token>
+```
+
+Admin-only routes are protected by role-based middleware.
+
+## Dataset and RAG
+
+The proverb dataset is stored in ChromaDB with metadata such as:
+
+- proverb
+- meaning
+- english_meaning
+- keyword
+- category
+- example
+
+The RAG pipeline uses:
+
+- semantic retrieval from ChromaDB
+- lexical fallback search
+- metadata awareness
+- query rewrite support when enabled
+- dataset-only guardrails
+
+The assistant should not invent new proverbs. Proverbs and meanings must come from the indexed dataset.
+
+## Main Backend APIs
+
+Chat:
+
+```text
+POST /api/v1/chat
+```
+
+History:
+
+```text
+GET /api/v1/history
+PATCH /api/v1/history/{conversation_id}
+DELETE /api/v1/history/{conversation_id}
+```
+
+Proverbs:
+
+```text
+GET /api/v1/proverbs
+POST /api/v1/proverbs
+PUT /api/v1/proverbs/{proverb_id}
+DELETE /api/v1/proverbs/{proverb_id}
+DELETE /api/v1/proverbs
+```
+
+Import and reindex:
+
+```text
+POST /api/v1/import-docx
+GET /api/v1/import-docx/status/{job_id}
+POST /api/v1/reindex
+```
+
+Voice:
+
+```text
+POST /api/v1/speech-to-text
+POST /api/v1/transcribe
+POST /api/v1/speech
+```
+
+Quiz:
+
+```text
+POST /api/v1/quiz/start
+POST /api/v1/quiz/submit
+```
+
+Favorites:
+
+```text
+POST /api/v1/favorites/{proverb_id}
+DELETE /api/v1/favorites/{proverb_id}
+GET /api/v1/favorites
+GET /api/v1/favorites/check/{proverb_id}
+```
+
+## AI Quiz Mode
+
+Quiz Mode lets users practice meanings from the dataset.
+
+Frontend route:
+
+```text
+/quiz
+```
+
+Start quiz request:
+
+```json
+{
+  "difficulty": "easy",
+  "question_count": 5
+}
+```
+
+Quiz questions are generated quickly from the indexed dataset. The system uses dataset meanings as correct answers and other dataset meanings as distractors.
+
+Submit quiz request:
+
+```json
+{
+  "quiz_id": "...",
+  "answers": [
+    {
+      "question_id": 1,
+      "selected": 2
+    }
+  ]
+}
+```
+
+The result screen shows:
+
+- final score
+- percentage
+- correct answers
+- wrong answers
+- review cards
+
+## Favorite Proverbs
+
+Users can save proverbs to their personal favorites.
+
+Frontend route:
+
+```text
+/favorites
+```
+
+Favorites are stored in MongoDB as references only:
+
+- user_id
+- proverb_id
+- created_at
+
+The app does not duplicate proverb data. The favorites page hydrates proverb details from the existing ChromaDB collection.
+
+Favorite features:
+
+- Favorite button on proverb answer cards
+- Favorite button on related proverb cards
+- Favorites page
+- Empty state with `Explore Proverbs`
+- Detail modal for each favorite
+- Remove favorite button
+
+## Voice Features
+
+The frontend records audio through the browser and sends it to the backend.
+
+Backend flow:
+
+```text
+Browser MediaRecorder
+  -> FastAPI upload endpoint
+  -> FFmpeg preprocessing
+  -> Gemini speech-to-text
+  -> RAG chat
+  -> optional Edge TTS
+```
+
+FFmpeg must be installed and available on `PATH`, or configured with:
+
+```env
+FFMPEG_PATH="C:\\ffmpeg\\bin\\ffmpeg.exe"
+```
+
+## Frontend Pages
+
+User pages:
+
+```text
+/dashboard   Main chat and proverb assistant
+/history     Chat history
+/quiz        Quiz mode
+/favorites   Saved favorite proverbs
+```
+
+Auth pages:
+
+```text
+/login
+/register
+```
+
+Admin pages:
+
+```text
+/admin
+/admin/import
+/admin/proverbs
+```
+
+## Development Commands
+
+Backend compile check:
+
+```powershell
+python -m compileall backend/app
+```
+
+Frontend build:
+
+```powershell
+cd frontend
+npm run build
+```
+
+Frontend dev server:
+
+```powershell
+cd frontend
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+
+## Notes
+
+- MongoDB must be running before backend startup.
+- Ollama must be running before using chat, embeddings, or reindex features.
+- Gemini API key is required for Gemini speech-to-text.
+- Edge TTS requires internet access.
+- If ChromaDB embedding dimensions mismatch, rebuild the dataset index.
+- New favorite buttons require proverb ids in answer payloads, so older saved chat messages may not show favorite controls.
+
+## License
+
+This project is for educational use and Myanmar proverb preservation.

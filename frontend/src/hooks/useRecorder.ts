@@ -8,6 +8,7 @@ interface UseRecorderOptions {
   onError?: (message: string) => void;
   onRecordingStart?: () => void;
   silenceMs?: number;
+  noSpeechTimeoutMs?: number;
   maxRecordingMs?: number;
 }
 
@@ -36,11 +37,36 @@ function getAudioLevel(data: Uint8Array): number {
   return Math.sqrt(total / data.length);
 }
 
+function getMicrophoneErrorMessage(error: unknown): string {
+  if (!window.isSecureContext) {
+    return "Microphone access requires HTTPS. Open the secure https:// version of this site.";
+  }
+
+  if (!(error instanceof DOMException)) {
+    return "Could not access the microphone. Please try again.";
+  }
+
+  switch (error.name) {
+    case "NotAllowedError":
+    case "SecurityError":
+      return "Microphone access was blocked. Allow microphone permission in your browser settings, then try again.";
+    case "NotFoundError":
+    case "DevicesNotFoundError":
+      return "No microphone was found. Connect or enable a microphone, then try again.";
+    case "NotReadableError":
+    case "TrackStartError":
+      return "The microphone is being used by another app. Close it and try again.";
+    default:
+      return "Could not access the microphone. Please check browser permissions and try again.";
+  }
+}
+
 export function useRecorder({
   onRecordingReady,
   onError,
   onRecordingStart,
-  silenceMs = 650,
+  silenceMs = 900,
+  noSpeechTimeoutMs = 6_000,
   maxRecordingMs = 20_000,
 }: UseRecorderOptions): UseRecorderResult {
   const [status, setStatus] = useState<RecorderStatus>("idle");
@@ -110,15 +136,28 @@ export function useRecorder({
       const now = Date.now();
       setAudioLevel(level);
 
-      if (level > 0.025) {
+      const voiceStartThreshold = 0.035;
+      const voiceContinueThreshold = 0.022;
+      const hasMinimumAudio = now - startedAtRef.current > 450;
+      const isVoiceLevel = heardVoiceRef.current
+        ? level > voiceContinueThreshold
+        : level > voiceStartThreshold;
+
+      if (isVoiceLevel) {
         heardVoiceRef.current = true;
         lastVoiceAtRef.current = now;
       }
 
-      const hasMinimumAudio = now - startedAtRef.current > 450;
       const silenceElapsed = now - lastVoiceAtRef.current;
       if (heardVoiceRef.current && hasMinimumAudio && silenceElapsed >= silenceMs) {
         stopRecording();
+        return;
+      }
+
+      if (!heardVoiceRef.current && now - startedAtRef.current >= noSpeechTimeoutMs) {
+        cancelledRef.current = true;
+        stopRecording();
+        onErrorRef.current?.("No speech was detected. Please try speaking again.");
         return;
       }
 
@@ -127,10 +166,14 @@ export function useRecorder({
 
     lastVoiceAtRef.current = Date.now();
     animationRef.current = requestAnimationFrame(tick);
-  }, [silenceMs, stopRecording]);
+  }, [noSpeechTimeoutMs, silenceMs, stopRecording]);
 
   const startRecording = useCallback(async () => {
     if (status === "recording") return;
+    if (!window.isSecureContext) {
+      onErrorRef.current?.("Microphone access requires HTTPS. Open the secure https:// version of this site.");
+      return;
+    }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       onErrorRef.current?.("Voice recording is not supported on this browser.");
       return;
@@ -189,11 +232,7 @@ export function useRecorder({
     } catch (error) {
       cleanup();
       setStatus("idle");
-      if (error instanceof DOMException && error.name === "NotAllowedError") {
-        onErrorRef.current?.("Microphone access was denied. Please allow microphone permission and try again.");
-        return;
-      }
-      onErrorRef.current?.("Could not access the microphone. Please try again.");
+      onErrorRef.current?.(getMicrophoneErrorMessage(error));
     }
   }, [cleanup, maxRecordingMs, monitorSilence, status, stopRecording]);
 

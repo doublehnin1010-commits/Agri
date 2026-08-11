@@ -1,5 +1,4 @@
 import type { VoiceInputMode } from "../types/speech";
-import { getSpeechRecognitionConstructor } from "./speechRecognition";
 
 export function isMicrophoneAvailable(): boolean {
   return typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia);
@@ -16,7 +15,6 @@ export function isMediaRecorderSupported(): boolean {
 export function getVoiceInputMode(): VoiceInputMode {
   if (typeof window === "undefined") return "unavailable";
   if (isMicrophoneAvailable() && isMediaRecorderSupported()) return "media-recorder";
-  if (getSpeechRecognitionConstructor()) return "speech-api";
   return "unavailable";
 }
 
@@ -28,9 +26,8 @@ export function isVoiceInputSupported(): boolean {
 }
 
 export function getVoiceUnavailableMessage(): string {
-  const mode = getVoiceInputMode();
-  if (mode === "media-recorder" && !isSecureMicContext()) {
-    return "Voice needs HTTPS. Open the https:// link from Vite and accept the certificate on your phone.";
+  if (!isSecureMicContext()) {
+    return "Voice needs HTTPS. Open the secure https:// version of this site and allow microphone access.";
   }
   return "Voice input is not supported on this browser.";
 }

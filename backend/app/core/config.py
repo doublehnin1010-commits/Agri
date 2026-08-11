@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     ollama_base_url: str = Field(default="http://localhost:11434", validation_alias="OLLAMA_BASE_URL")
     ollama_model: str = "qwen3:0.6b"
     chat_model: str = Field(default="qwen3:0.6b", validation_alias=AliasChoices("CHAT_MODEL", "OLLAMA_CHAT_MODEL"))
+    chat_provider: str = "ollama"
     utility_model: str = Field(default="qwen3:0.6b", validation_alias=AliasChoices("UTILITY_MODEL", "OLLAMA_UTILITY_MODEL"))
     ollama_fast_model: str = Field(default="qwen3:0.6b", validation_alias=AliasChoices("UTILITY_MODEL", "OLLAMA_FAST_MODEL"))
     ollama_complex_model: str = Field(default="qwen3:0.6b", validation_alias=AliasChoices("CHAT_MODEL", "OLLAMA_COMPLEX_MODEL"))
@@ -62,13 +63,15 @@ class Settings(BaseSettings):
     rag_min_lexical_similarity: float = 0.5
     rag_semantic_threshold: float = 0.5
 
+    # Deprecated compatibility fields. Gemini STT is the active transcription path.
     whisper_model: str = "base"
     whisper_device: str = "auto"
     whisper_compute_type: str = "auto"
     whisper_beam_size: int = 5
     whisper_vad_silence_ms: int = 500
     whisper_local_files_only: bool = True
-    preload_whisper: bool = True
+    preload_whisper: bool = False
+
     speech_max_upload_mb: int = 25
     ffmpeg_timeout_seconds: int = 30
     ffmpeg_path: str = "ffmpeg"
@@ -77,6 +80,19 @@ class Settings(BaseSettings):
     edge_tts_rate: str = "+0%"
     tts_max_characters: int = 3000
 
+    gemini_api_key: str = Field(default="", validation_alias=AliasChoices("GEMINI_API_KEY", "GOOGLE_API_KEY"))
+    gemini_api_keys: str = Field(default="", validation_alias=AliasChoices("GEMINI_API_KEYS", "GOOGLE_API_KEYS"))
+    gemini_chat_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
+    gemini_chat_model: str = "gemini-flash-latest"
+    gemini_chat_fallback_model: str = "gemini-3.1-flash-lite"
+    gemini_chat_timeout_seconds: int = 120
+    gemini_chat_max_retries: int = 2
+    gemini_chat_retry_base_seconds: float = 1.0
+    gemini_stt_model: str = "gemini-3.5-flash"
+    gemini_stt_fallback_model: str = "gemini-3.1-flash-lite"
+    gemini_stt_timeout_seconds: int = 120
+    gemini_stt_max_retries: int = 2
+    gemini_stt_retry_base_seconds: float = 1.0
     admin_email: str = ""
 
     @property

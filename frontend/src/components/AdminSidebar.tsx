@@ -24,11 +24,11 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
         onClick={onClose}
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-slate-200 bg-white transition-transform lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-slate-800 bg-slate-900 text-slate-200 transition-transform lg:static lg:translate-x-0 [&_.text-slate-950]:text-white [&_.text-slate-600]:text-slate-300 [&_.text-slate-500]:text-slate-400 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4">
+        <div className="flex items-center justify-between border-b border-slate-800 px-4 py-4">
           <Brand />
           <button
             type="button"
@@ -50,7 +50,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
                 `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
                   isActive
                     ? "bg-brand-50 text-brand-700"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
                 }`
               }
             >

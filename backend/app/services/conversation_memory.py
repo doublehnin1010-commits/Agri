@@ -45,6 +45,7 @@ class ConversationMemoryService:
             "last_meaning": None,
             "last_example": None,
             "last_sources": [],
+            "last_list_offset": 0,
             "history": [],
         }
 
@@ -62,6 +63,7 @@ class ConversationMemoryService:
             "meaning_simple_mm": memory.get("last_meaning"),
             "example_mm": memory.get("last_example"),
             "sources": sources,
+            "list_offset": memory.get("last_list_offset", 0),
         }
 
     @classmethod
@@ -86,6 +88,7 @@ class ConversationMemoryService:
             state["last_sources"] = sources
         elif intent == "proverb_list" and sources:
             state["last_sources"] = sources
+            state["last_list_offset"] = int(answer.get("list_offset") or 0)
 
         if topic:
             state["last_topic"] = topic

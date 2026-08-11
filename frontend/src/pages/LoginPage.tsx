@@ -1,4 +1,4 @@
-import { LogIn } from "lucide-react";
+import { BookOpenText, LogIn, Mail, ShieldCheck } from "lucide-react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -29,7 +29,8 @@ export function LoginPage() {
       const user = response.user ?? userFromToken(token, response.role);
       setSession(token, user);
       toast.success("Welcome back");
-      const redirectTo = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/dashboard";
+      const requestedPath = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+      const redirectTo = user.role === "admin" ? "/admin" : requestedPath ?? "/dashboard";
       navigate(redirectTo, { replace: true });
     } catch (error) {
       toast.error(getApiErrorMessage(error));
@@ -37,18 +38,31 @@ export function LoginPage() {
   };
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-soft">
-      <h1 className="text-2xl font-bold text-slate-950">Login</h1>
-      <p className="mt-2 text-sm leading-6 text-slate-500">Continue to your AI proverb tutor workspace.</p>
-      <form className="mt-6 space-y-4" onSubmit={handleSubmit(onSubmit)}>
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-soft">
+      <div className="border-b border-slate-100 px-6 py-5">
+        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
+          <BookOpenText className="h-5 w-5" aria-hidden="true" />
+        </div>
+        <h1 className="mt-4 text-2xl font-bold text-slate-950">Welcome back</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          Sign in to Burmese Proverbs Hub and continue your learning workspace.
+        </p>
+      </div>
+      <form className="space-y-4 px-6 py-5" onSubmit={handleSubmit(onSubmit)}>
         <div className="space-y-2">
           <label className="form-label" htmlFor="email">Email</label>
-          <input id="email" type="email" className="form-input" {...register("email", { required: "Email is required" })} />
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <input id="email" type="email" autoComplete="email" className="form-input pl-9" {...register("email", { required: "Email is required" })} />
+          </div>
           {errors.email ? <p className="text-sm text-red-600">{errors.email.message}</p> : null}
         </div>
         <div className="space-y-2">
           <label className="form-label" htmlFor="password">Password</label>
-          <input id="password" type="password" className="form-input" {...register("password", { required: "Password is required" })} />
+          <div className="relative">
+            <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <input id="password" type="password" autoComplete="current-password" className="form-input pl-9" {...register("password", { required: "Password is required" })} />
+          </div>
           {errors.password ? <p className="text-sm text-red-600">{errors.password.message}</p> : null}
         </div>
         <button type="submit" className="btn-primary w-full" disabled={isSubmitting}>
@@ -56,7 +70,7 @@ export function LoginPage() {
           {isSubmitting ? "Signing in..." : "Login"}
         </button>
       </form>
-      <p className="mt-5 text-center text-sm text-slate-500">
+      <p className="border-t border-slate-100 px-6 py-4 text-center text-sm text-slate-500">
         New here? <Link to="/register" className="font-semibold text-brand-700 hover:underline">Create an account</Link>
       </p>
     </div>
