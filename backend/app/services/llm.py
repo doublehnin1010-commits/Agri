@@ -5,6 +5,7 @@ from typing import Any
 from app.services.llm_service import (
     DATASET_ONLY_SYSTEM_INSTRUCTION,
     agenerate_chat_response,
+    agenerate_multimodal_response,
     agenerate_utility_response,
     configure_llm,
     generate_answer,
@@ -16,6 +17,7 @@ from app.services.llm_service import (
 __all__ = [
     "DATASET_ONLY_SYSTEM_INSTRUCTION",
     "agenerate_chat_response",
+    "agenerate_multimodal_response",
     "agenerate_utility_response",
     "configure_llm",
     "generate_answer",

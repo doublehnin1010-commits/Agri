@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64
 import json
@@ -41,30 +41,30 @@ Your task is to accurately transcribe the user's speech into text.
 6. Preserve Myanmar Unicode correctly.
 7. Never convert Myanmar words into Romanized text.
 8. If the speaker uses both Myanmar and English, preserve both languages exactly as spoken.
-9. If the speaker is asking about a Myanmar proverb, transcribe the proverb exactly.
+9. If the speaker is asking about agriculture, crops, soil, fertilizer, irrigation, pests, or plant diseases, transcribe those terms carefully.
 10. Do not guess missing words. If a word is unclear, transcribe the remaining speech as accurately as possible.
 
 ## Educational Context
 
 The audio is expected to contain:
 
-* Myanmar proverbs
-* Questions about proverb meanings
+* Agriculture and farming questions
+* Crop, soil, fertilizer, irrigation, pest, and disease terms
 * Requests for explanations
 * Requests for English meanings
-* Requests for related proverbs
+* Requests about uploaded agriculture documents
 * Educational conversations
 
 Common vocabulary includes:
 
-* စကားပုံ
-* အဓိပ္ပာယ်
-* ရှင်းပြပါ
-* ဥပမာ
-* ဘာကိုဆိုလိုတာလဲ
-* ဆက်စပ်စကားပုံ
-* အင်္ဂလိပ်အဓိပ္ပာယ်
-* သင်ခန်းစာ
+* á€…á€€á€¬á€¸á€•á€¯á€¶
+* á€¡á€“á€­á€•á€¹á€•á€¬á€šá€º
+* á€›á€¾á€„á€ºá€¸á€•á€¼á€•á€«
+* á€¥á€•á€™á€¬
+* á€˜á€¬á€€á€­á€¯á€†á€­á€¯á€œá€­á€¯á€á€¬á€œá€²
+* á€†á€€á€ºá€…á€•á€ºá€…á€€á€¬á€¸á€•á€¯á€¶
+* á€¡á€„á€ºá€¹á€‚á€œá€­á€•á€ºá€¡á€“á€­á€•á€¹á€•á€¬á€šá€º
+* á€žá€„á€ºá€á€”á€ºá€¸á€…á€¬
 * Generate Image
 * Illustration
 
@@ -425,3 +425,5 @@ def _gemini_error_message(raw: str) -> str:
     except json.JSONDecodeError:
         pass
     return raw.strip()[:500] or "No error details were returned."
+
+

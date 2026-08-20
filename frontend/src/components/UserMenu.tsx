@@ -18,7 +18,7 @@ export function UserMenu() {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex min-w-0 items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+        className="flex min-w-0 items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-semibold text-[#607D8B] transition hover:bg-brand-50 hover:text-brand-700"
       >
         <UserRound className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span className="hidden max-w-36 truncate sm:block">{user?.email}</span>
@@ -26,9 +26,9 @@ export function UserMenu() {
       </button>
 
       {open ? (
-        <div className="absolute right-0 mt-2 w-64 rounded-lg border border-slate-200 bg-white p-2 shadow-soft">
+        <div className="absolute right-0 mt-2 w-64 rounded-lg border border-cream-200 bg-white p-2 shadow-soft">
           <div className="px-3 py-2">
-            <p className="truncate text-sm font-bold text-slate-950">{user?.email}</p>
+            <p className="truncate text-sm font-bold text-[#263238]">{user?.email}</p>
             <p className="mt-1 inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-brand-700">
               <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
               {user?.role ?? "user"}
@@ -37,7 +37,7 @@ export function UserMenu() {
           <button
             type="button"
             onClick={handleLogout}
-            className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
+            className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50"
           >
             <LogOut className="h-4 w-4" aria-hidden="true" />
             Logout
@@ -47,3 +47,4 @@ export function UserMenu() {
     </div>
   );
 }
+

@@ -1,15 +1,12 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+﻿import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AdminLayout } from "../layouts/AdminLayout";
 import { AppLayout } from "../layouts/AppLayout";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { AdminDashboardPage } from "../pages/admin/AdminDashboardPage";
-import { ImportDatasetPage } from "../pages/admin/ImportDatasetPage";
-import { ProverbsManagementPage } from "../pages/admin/ProverbsManagementPage";
+import { DocumentsPage } from "../pages/admin/DocumentsPage";
 import { ChatPage } from "../pages/ChatPage";
-import { FavoritesPage } from "../pages/FavoritesPage";
 import { HistoryPage } from "../pages/HistoryPage";
 import { LoginPage } from "../pages/LoginPage";
-import { QuizPage } from "../pages/QuizPage";
 import { RegisterPage } from "../pages/RegisterPage";
 import { ProtectedRoute } from "./ProtectedRoute";
 
@@ -26,16 +23,12 @@ export function AppRouter() {
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<ChatPage />} />
             <Route path="/history" element={<HistoryPage />} />
-            <Route path="/favorites" element={<FavoritesPage />} />
-            <Route path="/quiz" element={<QuizPage />} />
           </Route>
         </Route>
 
         <Route element={<ProtectedRoute roles={["admin"]} />}>
           <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<AdminDashboardPage />} />
-            <Route path="import" element={<ImportDatasetPage />} />
-            <Route path="proverbs" element={<ProverbsManagementPage />} />
+            <Route index element={<AdminDashboardPage />} />            <Route path="documents" element={<DocumentsPage />} />
           </Route>
         </Route>
 
@@ -45,3 +38,4 @@ export function AppRouter() {
     </BrowserRouter>
   );
 }
+

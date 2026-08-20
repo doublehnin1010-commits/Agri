@@ -1,4 +1,4 @@
-from enum import Enum
+﻿from enum import Enum
 
 
 class Role(str, Enum):
@@ -7,13 +7,11 @@ class Role(str, Enum):
 
 
 ADMIN_ONLY_PATHS: set[tuple[str, str]] = {
-    ("POST", "/import-docx"),
-    ("POST", "/proverbs"),
-    ("DELETE", "/proverbs"),
+    ("POST", "/documents/upload"),
 }
 
 ADMIN_ONLY_PREFIXES: list[tuple[str, str]] = [
-    ("GET", "/import-docx/status/"),
-    ("PUT", "/proverbs/"),
-    ("DELETE", "/proverbs/"),
+    ("GET", "/documents"),
+    ("DELETE", "/documents/"),
+    ("POST", "/documents/"),
 ]

@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: myanmar-proverbs-ai-tutor-backend
+    name: agriculture-ai-assistant-backend
     env: python
     plan: free
     rootDir: backend

@@ -1,4 +1,4 @@
-/** @type {import('tailwindcss').Config} */
+﻿/** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
@@ -14,28 +14,35 @@ export default {
       },
       colors: {
         cream: {
-          50: "#fffdf8",
-          DEFAULT: "#f8f3e7",
-          100: "#f3ead7",
-          200: "#ead9b8",
+          50: "#F8FAF7",
+          DEFAULT: "#F8FAF7",
+          100: "#E8F5E9",
+          200: "#DDE5DD",
         },
         brand: {
-          50: "#fff7ed",
-          100: "#ffedd5",
-          200: "#fed7aa",
-          300: "#fdba74",
-          400: "#fb923c",
-          500: "#ea580c",
-          600: "#d97706",
-          700: "#b45309",
-          800: "#92400e",
-          900: "#78350f",
+          50: "#E8F5E9",
+          100: "#D7EED8",
+          200: "#B7DDBA",
+          300: "#8BC68F",
+          400: "#5EAA63",
+          500: "#388E3C",
+          600: "#2E7D32",
+          700: "#1B5E20",
+          800: "#154A19",
+          900: "#0F3512",
+        },
+        accent: {
+          50: "#E8F5E9",
+          100: "#E8F5E9",
+          500: "#2E7D32",
+          600: "#1B5E20",
         },
       },
       boxShadow: {
-        soft: "0 18px 60px rgba(15, 23, 42, 0.10)",
+        soft: "0 18px 60px rgba(38, 50, 56, 0.10)",
       },
     },
   },
   plugins: [],
 };
+

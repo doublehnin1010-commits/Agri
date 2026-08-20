@@ -157,7 +157,7 @@ export function HistoryPage() {
               ) : null}
 
               {error ? (
-                <p className="mt-3 rounded-lg bg-red-50 p-3 text-xs font-medium leading-5 text-red-700">{error}</p>
+                <p className="mt-3 rounded-lg bg-brand-50 p-3 text-xs font-medium leading-5 text-brand-700">{error}</p>
               ) : null}
             </div>
           </div>
@@ -187,7 +187,6 @@ export function HistoryPage() {
                 <div className="min-h-full">
                   <ChatMessages
                     messages={selectedConversation.messages}
-                    showStarterSuggestions={false}
                     emptyStateTitle="This conversation is empty"
                     emptyStateDescription="There are no messages in this thread yet."
                   />

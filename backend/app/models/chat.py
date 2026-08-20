@@ -1,5 +1,4 @@
-from datetime import datetime
-
+﻿from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -11,17 +10,20 @@ class ChatRequest(BaseModel):
 
 
 class SourceItem(BaseModel):
-    keyword: str | None = None
-    proverb: str | None = None
-    meaning: str | None = None
-    example: str | None = None
+    document_id: str | None = None
+    filename: str | None = None
+    file_type: str | None = None
+    chunk_id: int | str | None = None
+    page_number: int | None = None
+    source: str | None = None
+    preview: str | None = None
     score: float | None = None
+    similarity: float | None = None
 
 
 class ChatAnswer(BaseModel):
-    proverb: str | None = None
-    meaning_simple_mm: str | None = None
-    example_mm: str | None = None
+    answer: str | None = None
+    language: str | None = None
     sources: list[SourceItem] = []
 
 
@@ -36,4 +38,3 @@ class HistoryItem(BaseModel):
     user_message: str
     assistant_message: dict
     created_at: datetime
-

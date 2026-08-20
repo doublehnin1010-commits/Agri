@@ -57,8 +57,8 @@ export function HistoryActionModals({
 
       <Modal title="Delete Conversation" isOpen={Boolean(deleteConversation)} onClose={onDeleteClose}>
         <div className="space-y-4">
-          <p className="text-sm leading-6 text-slate-600">
-            Delete <span className="font-semibold text-slate-950">{deleteConversation?.title}</span>? This cannot be
+          <p className="text-sm leading-6 text-[#607D8B]">
+            Delete <span className="font-semibold text-[#263238]">{deleteConversation?.title}</span>? This cannot be
             undone.
           </p>
           <div className="flex justify-end gap-3">
@@ -68,7 +68,7 @@ export function HistoryActionModals({
             <button
               type="button"
               onClick={onDeleteConfirm}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-100 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="btn-primary"
               disabled={deleteBusy}
             >
               Delete

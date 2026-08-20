@@ -1,4 +1,4 @@
-import { HistoryActions } from "./HistoryActions";
+﻿import { HistoryActions } from "./HistoryActions";
 import type { HistoryConversation } from "../types/history";
 
 interface HistoryItemProps {
@@ -21,11 +21,11 @@ export function HistoryItem({
   const itemClass =
     variant === "dark"
       ? active
-        ? "bg-slate-800 text-white"
-        : "text-slate-300 hover:bg-slate-800 hover:text-white"
+        ? "bg-brand-50 text-brand-700"
+        : "text-[#607D8B] hover:bg-brand-50 hover:text-brand-700"
       : active
         ? "bg-brand-50 text-brand-700"
-        : "text-slate-600 hover:bg-slate-100 hover:text-slate-950";
+        : "text-[#607D8B] hover:bg-brand-50 hover:text-[#263238]";
 
   return (
     <div
@@ -49,3 +49,5 @@ export function HistoryItem({
     </div>
   );
 }
+
+

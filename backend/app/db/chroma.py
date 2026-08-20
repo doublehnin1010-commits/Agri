@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import shutil
 import time
@@ -25,7 +25,7 @@ def _resolve_chroma_path(path: str) -> str:
 
 
 def connect_chroma() -> None:
-    """Initialize the LangChain Chroma vector store with OllamaEmbeddings."""
+    """Initialize the LangChain Chroma vector store with Gemini embeddings."""
 
     from app.services.embedding_service import get_embeddings
 
@@ -99,3 +99,4 @@ def delete_chroma_store() -> bool:
             return False
 
     return False
+

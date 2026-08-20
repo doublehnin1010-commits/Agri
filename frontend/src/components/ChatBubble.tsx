@@ -1,7 +1,6 @@
-import { BookOpenText, Bot, GraduationCap, Lightbulb, MessageSquareText, UserRound } from "lucide-react";
+﻿import { Bot, UserRound } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import type { ChatMessage } from "../types";
-import { getAnswerLabels, getAnswerSections, looksEnglish } from "../utils/answer";
-import { FavoriteButton } from "./FavoriteButton";
 
 interface ChatBubbleProps {
   message: ChatMessage;
@@ -9,90 +8,49 @@ interface ChatBubbleProps {
 
 export function ChatBubble({ message }: ChatBubbleProps) {
   const isUser = message.role === "user";
-  const rawMeaning = cleanText(message.answer?.meaning_simple_mm) ?? cleanText(message.answer?.meaning);
-  const sections = getAnswerSections(message.answer);
-  const proverb = sections.proverb;
-  const proverbId =
-    cleanText(message.answer?.proverb_id) ??
-    cleanText(message.answer?.sources?.find((source) => cleanText(source.proverb) === proverb)?.id) ??
-    cleanText(message.answer?.sources?.[0]?.id);
-  const isProverbList = message.answer?.intent === "proverb_list";
-  const isEnglish = message.answer?.language === "en" || looksEnglish(rawMeaning);
-  const labels = getAnswerLabels(isEnglish);
-  const hasStructuredAnswer = !isUser && Boolean(proverb);
 
   return (
     <div className={`flex gap-3 ${isUser ? "justify-end" : "justify-start"}`}>
       {!isUser ? (
-        <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white shadow-sm">
+        <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700 shadow-sm">
           <Bot className="h-5 w-5" aria-hidden="true" />
         </div>
       ) : null}
 
-      <div
-        className={`text-sm leading-7 ${
-          isUser
-            ? "max-w-[min(680px,85%)] rounded-lg bg-brand-600 px-4 py-3 text-white shadow-sm"
-            : "min-w-0 flex-1 rounded-lg border border-cream-200 bg-cream-50 px-5 py-5 text-slate-800 shadow-sm sm:px-6"
-        }`}
-      >
-        {isProverbList ? (
-          <div className="space-y-4">
-            {message.answer?.sources?.length ? (
-              <div className="grid gap-3 md:grid-cols-2">
-                {message.answer.sources
-                  .filter((source) => source.proverb)
-                  .map((source, index) => {
-                    const sourceId = cleanText(source.id);
-                    return (
-                      <article key={sourceId ?? `${source.proverb}-${index}`} className="rounded-lg border border-cream-200 bg-white p-4 shadow-sm">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-brand-700">Proverb {index + 1}</p>
-                            <h3 className="mt-1 break-words text-base font-bold leading-7 text-slate-950">{source.proverb}</h3>
-                          </div>
-                          {sourceId ? <FavoriteButton proverbId={sourceId} compact /> : null}
-                        </div>
-                        <p className="mt-3 line-clamp-4 text-sm leading-6 text-slate-600">
-                          {source.meaning || source.english_meaning || "No meaning available."}
-                        </p>
-                      </article>
-                    );
-                  })}
-              </div>
-            ) : rawMeaning ? (
-              <p className="whitespace-pre-wrap text-[15px] leading-8">{rawMeaning}</p>
-            ) : null}
-            {sections.example ? <p className="whitespace-pre-wrap text-[15px] leading-8 text-slate-600">{sections.example}</p> : null}
+      <div className={`text-sm leading-7 ${isUser ? "max-w-[min(680px,85%)] rounded-lg bg-brand-600 px-4 py-3 text-white shadow-sm" : "min-w-0 flex-1 rounded-lg border border-cream-200 bg-white px-5 py-5 text-[#263238] shadow-sm sm:px-6"}`}>
+        {isUser ? (
+          <div>
+            {message.imageUrl ? <img src={message.imageUrl} alt="Uploaded agriculture image" className="mb-3 max-h-72 max-w-full rounded-lg object-contain" /> : null}
+            <p className="whitespace-pre-wrap break-words text-[15px] leading-8">{message.content.replace(/^\[Image attached\]\n?/, "")}</p>
           </div>
-        ) : hasStructuredAnswer ? (
-          <article>
-            <header className="flex flex-col gap-3 border-b border-cream-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex min-w-0 items-start gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white">
-                  <BookOpenText className="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-brand-700">{labels.proverb}</p>
-                  <h3 className="mt-1 break-words text-lg font-bold leading-8 text-slate-950">{proverb}</h3>
-                </div>
-              </div>
-              {proverbId ? <FavoriteButton proverbId={proverbId} compact /> : null}
-            </header>
-
-            <div className="divide-y divide-cream-200">
-              <AnswerSection icon={MessageSquareText} label={labels.meaning} text={sections.meaning} />
-              <AnswerSection icon={Lightbulb} label={labels.lesson} text={sections.lesson} />
-              <AnswerSection icon={GraduationCap} label={labels.example} text={sections.example} />
-            </div>
-          </article>
         ) : (
-          <p className="whitespace-pre-wrap text-[15px] leading-8">{message.content}</p>
+          <ReactMarkdown
+            components={{
+              h1: ({ children }) => <h1 className="mb-4 text-xl font-bold leading-tight text-brand-700">{children}</h1>,
+              h2: ({ children }) => <h2 className="mb-3 mt-6 text-lg font-bold leading-tight text-brand-700 first:mt-0">{children}</h2>,
+              h3: ({ children }) => <h3 className="mb-2 mt-5 text-base font-bold leading-tight text-[#263238] first:mt-0">{children}</h3>,
+              p: ({ children }) => <p className="mb-4 break-words leading-8 last:mb-0">{children}</p>,
+              ul: ({ children }) => <ul className="mb-4 list-disc space-y-2 pl-6 last:mb-0">{children}</ul>,
+              ol: ({ children }) => <ol className="mb-4 list-decimal space-y-2 pl-6 last:mb-0">{children}</ol>,
+              li: ({ children }) => <li className="break-words pl-1 leading-8">{children}</li>,
+              strong: ({ children }) => <strong className="font-bold text-brand-700">{children}</strong>,
+              blockquote: ({ children }) => <blockquote className="mb-4 border-l-4 border-brand-200 bg-brand-50 px-4 py-2 last:mb-0">{children}</blockquote>,
+              code: ({ children, className }) => className ? (
+                <code className="block overflow-x-auto rounded-lg bg-[#263238] p-3 text-sm leading-6 text-white">{children}</code>
+              ) : (
+                <code className="rounded bg-brand-50 px-1.5 py-0.5 text-sm font-semibold text-brand-700">{children}</code>
+              ),
+              a: ({ children, href }) => <a className="font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-800" href={href}>{children}</a>,
+              hr: () => <hr className="my-5 border-cream-200" />,
+            }}
+          >
+            {message.content}
+          </ReactMarkdown>
         )}
       </div>
 
       {isUser ? (
-        <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-slate-700">
+        <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-[#263238]">
           <UserRound className="h-5 w-5" aria-hidden="true" />
         </div>
       ) : null}
@@ -100,28 +58,5 @@ export function ChatBubble({ message }: ChatBubbleProps) {
   );
 }
 
-function AnswerSection({
-  icon: Icon,
-  label,
-  text,
-}: {
-  icon: typeof MessageSquareText;
-  label: string;
-  text: string | null;
-}) {
-  if (!text) return null;
 
-  return (
-    <section className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-3 py-4 last:pb-0">
-      <Icon className="mt-1 h-5 w-5 text-brand-700" aria-hidden="true" />
-      <div className="min-w-0">
-        <h4 className="text-sm font-bold text-slate-950">{label}</h4>
-        <p className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-8 text-slate-700">{text}</p>
-      </div>
-    </section>
-  );
-}
 
-function cleanText(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}

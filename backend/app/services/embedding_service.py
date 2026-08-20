@@ -1,141 +1,90 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
-import asyncio
 import hashlib
-import json
-import logging
-from dataclasses import dataclass
-from typing import Any, Callable
-
-from langchain_core.documents import Document
-from langchain_ollama import OllamaEmbeddings
+import math
+import re
+import unicodedata
+from collections import Counter
+from typing import Any
 
 from app.core.config import settings
-from app.db.chroma import get_vectorstore
-from app.services.metadata_service import GeneratedMetadata
-from app.services.retriever_service import invalidate_metadata_cache
+
+_TOKEN_RE = re.compile(r"[\u1000-\u109F]+|[A-Za-z0-9]+")
 
 
-logger = logging.getLogger(__name__)
+class LocalHashEmbeddings:
+    """Small local embedding function for Chroma without API calls or quotas.
 
-DEFAULT_EMBEDDING_BATCH_SIZE = 100
-ProgressCallback = Callable[[int, int], None]
+    It uses hashed word/character n-gram features. This is not as semantically
+    rich as a hosted embedding model, but it is deterministic, offline, and good
+    enough for exact/near-exact document retrieval over uploaded knowledge.
+    """
 
-_embeddings: OllamaEmbeddings | None = None
+    def __init__(self, dimensions: int = 768):
+        self.dimensions = dimensions
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return [self._embed(text) for text in texts]
+
+    async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
+        return self.embed_documents(texts)
+
+    def embed_query(self, text: str) -> list[float]:
+        return self._embed(text)
+
+    async def aembed_query(self, text: str) -> list[float]:
+        return self.embed_query(text)
+
+    def _embed(self, text: str) -> list[float]:
+        features = _features(text)
+        vector = [0.0] * self.dimensions
+        if not features:
+            return vector
+
+        counts = Counter(features)
+        for feature, count in counts.items():
+            digest = hashlib.blake2b(feature.encode("utf-8"), digest_size=8).digest()
+            raw = int.from_bytes(digest, "big")
+            index = raw % self.dimensions
+            sign = 1.0 if (raw >> 63) == 0 else -1.0
+            vector[index] += sign * (1.0 + math.log(count))
+
+        norm = math.sqrt(sum(value * value for value in vector))
+        if norm == 0.0:
+            return vector
+        return [value / norm for value in vector]
 
 
-def get_embeddings() -> OllamaEmbeddings:
-    """Return the shared OllamaEmbeddings singleton."""
+def _features(text: str) -> list[str]:
+    normalized = unicodedata.normalize("NFC", (text or "").lower())
+    tokens = _TOKEN_RE.findall(normalized)
+    features: list[str] = []
+    for token in tokens:
+        features.append(f"w:{token}")
+        compact = re.sub(r"\s+", "", token)
+        if len(compact) >= 3:
+            for size in (3, 4):
+                if len(compact) >= size:
+                    features.extend(f"c{size}:{compact[i:i + size]}" for i in range(len(compact) - size + 1))
+    return features
 
+
+_embeddings: LocalHashEmbeddings | None = None
+
+
+def get_embeddings() -> LocalHashEmbeddings:
     global _embeddings
     if _embeddings is None:
-        if not settings.embedding_model.strip():
-            raise RuntimeError("EMBEDDING_MODEL must not be empty")
-        _embeddings = OllamaEmbeddings(
-            model=settings.embedding_model,
-            base_url=settings.ollama_base_url,
-        )
+        _embeddings = LocalHashEmbeddings(settings.local_embedding_dimensions)
     return _embeddings
 
 
 def configure_embeddings() -> None:
-    """Eagerly initialize the embedding model."""
-
     get_embeddings()
 
 
-@dataclass(frozen=True)
 class EmbeddingDocument:
-    """Document payload prepared for ChromaDB embedding and storage."""
-
-    id: str
-    page_content: str
-    metadata: dict[str, Any]
-
-
-def _stable_document_id(proverb: str) -> str:
-    raw = f"||{proverb}".encode("utf-8")
-    return hashlib.sha1(raw).hexdigest()
-
-
-def build_embedding_documents(
-    rows: list[tuple[str, str, str]],
-    metadata_rows: list[GeneratedMetadata],
-) -> list[EmbeddingDocument]:
-    """Create LangChain-ready documents from merged proverb rows and metadata."""
-
-    documents: list[EmbeddingDocument] = []
-    for (proverb, meaning, english_meaning), generated in zip(rows, metadata_rows):
-        keywords_list = list(generated.keywords)
-        keywords_text = ", ".join(keywords_list)
-
-        documents.append(
-            EmbeddingDocument(
-                id=_stable_document_id(proverb),
-                page_content=(
-                    f"Proverb:\n{proverb}\n\n"
-                    f"Meaning:\n{meaning}\n\n"
-                    f"English Meaning:\n{english_meaning}"
-                ),
-                metadata={
-                    "keyword": keywords_text,
-                    "meaning": meaning,
-                    "example": "",
-                    "proverb": proverb,
-                    "category": generated.category,
-                    "keywords": json.dumps(keywords_list, ensure_ascii=False),
-                    "english_meaning": english_meaning,
-                },
-            )
-        )
-
-    return documents
-
-
-def to_langchain_documents(documents: list[EmbeddingDocument]) -> list[Document]:
-    return [
-        Document(page_content=item.page_content, metadata=item.metadata, id=item.id)
-        for item in documents
-    ]
-
-
-def _upsert_documents_sync(
-    documents: list[EmbeddingDocument],
-    batch_size: int,
-    progress_callback: ProgressCallback | None = None,
-) -> int:
-    vectorstore = get_vectorstore()
-    langchain_docs = to_langchain_documents(documents)
-    created = 0
-
-    for index in range(0, len(langchain_docs), batch_size):
-        batch = langchain_docs[index : index + batch_size]
-        vectorstore.add_documents(batch, ids=[doc.id for doc in batch])
-        created += len(batch)
-        if progress_callback is not None:
-            progress_callback(created, len(documents))
-
-    return created
-
-
-async def upsert_embedding_documents(
-    documents: list[EmbeddingDocument],
-    batch_size: int = DEFAULT_EMBEDDING_BATCH_SIZE,
-    progress_callback: ProgressCallback | None = None,
-) -> int:
-    """Upsert LangChain documents on a worker thread to avoid blocking the event loop."""
-
-    if batch_size <= 0:
-        raise ValueError("batch_size must be greater than zero")
-    if not documents:
-        return 0
-
-    logger.info("Saving %s documents to ChromaDB via LangChain.", len(documents))
-    created = await asyncio.to_thread(
-        _upsert_documents_sync,
-        documents,
-        batch_size,
-        progress_callback,
-    )
-    invalidate_metadata_cache()
-    return created
+    def __init__(self, id: str, page_content: str, metadata: dict[str, Any]):
+        self.id = id
+        self.page_content = page_content
+        self.metadata = metadata

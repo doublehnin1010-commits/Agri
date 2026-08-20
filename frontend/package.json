@@ -1,5 +1,5 @@
 {
-  "name": "myanmar-proverbs-ai-tutor-frontend",
+  "name": "agriculture-ai-assistant-frontend",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -19,6 +19,7 @@
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.59.0",
     "react-hot-toast": "^2.5.2",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.6.2",
     "zustand": "^5.0.5"
   },

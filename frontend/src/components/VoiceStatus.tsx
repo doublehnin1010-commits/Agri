@@ -24,7 +24,7 @@ export function VoiceStatus({ status, audioLevel, compact = false }: VoiceStatus
   return (
     <div
       className={`flex min-h-6 items-center gap-2 text-xs font-semibold ${
-        compact ? "text-red-600" : "text-slate-500"
+        compact ? "text-brand-700" : "text-[#607D8B]"
       }`}
       aria-live="polite"
     >
@@ -34,7 +34,7 @@ export function VoiceStatus({ status, audioLevel, compact = false }: VoiceStatus
           {bars.map((bar, index) => (
             <span
               key={index}
-              className="w-1 rounded-full bg-red-500 transition-all"
+              className="w-1 rounded-full bg-brand-600 transition-all"
               style={{ height: `${8 + 16 * Math.max(level, bar * 0.35)}px` }}
             />
           ))}

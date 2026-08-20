@@ -1,4 +1,4 @@
-import { Book, DatabaseZap, LayoutDashboard, LibraryBig, PanelLeftClose } from "lucide-react";
+﻿import { Book, FileText, LayoutDashboard, PanelLeftClose } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { Brand } from "./Brand";
 
@@ -9,51 +9,24 @@ interface AdminSidebarProps {
 
 const items = [
   { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
-  {label : "Open Chat" , to : "/dashboard" , icon : Book },
-  { label: "Knowledge Import", to: "/admin/import", icon: DatabaseZap },
-  { label: "Proverbs Management", to: "/admin/proverbs", icon: LibraryBig },
+  { label: "Open Chat", to: "/dashboard", icon: Book },
+  { label: "Documents", to: "/admin/documents", icon: FileText },
 ];
 
 export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   return (
     <>
-      <div
-        className={`fixed inset-0 z-30 bg-slate-950/40 transition lg:hidden ${
-          isOpen ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
-        onClick={onClose}
-      />
-      <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-slate-800 bg-slate-900 text-slate-200 transition-transform lg:static lg:translate-x-0 [&_.text-slate-950]:text-white [&_.text-slate-600]:text-slate-300 [&_.text-slate-500]:text-slate-400 ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="flex items-center justify-between border-b border-slate-800 px-4 py-4">
+      <div className={`fixed inset-0 z-30 bg-[#263238]/30 transition lg:hidden ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} onClick={onClose} />
+      <aside className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-cream-200 bg-white text-[#263238] transition-transform lg:static lg:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex items-center justify-between border-b border-cream-200 px-4 py-4">
           <Brand />
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:hidden"
-            aria-label="Close admin sidebar"
-          >
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-[#607D8B] hover:bg-brand-50 hover:text-brand-700 lg:hidden" aria-label="Close admin sidebar">
             <PanelLeftClose className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
-        <nav className="flex-1 space-y-1 p-3 ">
+        <nav className="flex-1 space-y-1 p-3">
           {items.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/admin"}
-              onClick={onClose}
-              className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
-                  isActive
-                    ? "bg-brand-50 text-brand-700"
-                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                }`
-              }
-            >
+            <NavLink key={item.to} to={item.to} end={item.to === "/admin"} onClick={onClose} className={({ isActive }) => `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${isActive ? "bg-brand-50 text-brand-700" : "text-[#607D8B] hover:bg-brand-50 hover:text-brand-700"}`}>
               <item.icon className="h-5 w-5" aria-hidden="true" />
               {item.label}
             </NavLink>

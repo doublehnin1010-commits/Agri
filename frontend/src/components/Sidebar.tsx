@@ -1,4 +1,4 @@
-import { Heart, HelpCircle, Loader2, MessageSquarePlus, PanelLeftClose, Shield } from "lucide-react";
+import { Loader2, MessageSquarePlus, PanelLeftClose, Shield } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useNavigate } from "react-router-dom";
@@ -99,56 +99,40 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   return (
     <>
       <div
-        className={`fixed inset-0 z-30 bg-slate-950/40 transition lg:hidden ${
+        className={`fixed inset-0 z-30 bg-[#263238]/30 transition lg:hidden ${
           isOpen ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
         onClick={onClose}
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-slate-800 bg-slate-900 text-slate-200 transition-transform lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-cream-200 bg-white text-[#263238] transition-transform lg:static lg:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-slate-800 px-4 py-4">
+        <div className="flex items-center justify-between border-b border-cream-200 px-4 py-4">
           <Brand />
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white lg:hidden"
+            className="rounded-lg p-2 text-[#607D8B] hover:bg-brand-50 hover:text-brand-700 lg:hidden"
             aria-label="Close sidebar"
           >
             <PanelLeftClose className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
 
-        <div className="border-b border-slate-800 p-3">
+        <div className="border-b border-cream-200 p-3">
           <button type="button" onClick={handleNewChat} className="btn-primary w-full justify-start">
             <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />
             New Chat
           </button>
-          <Link
-            to="/quiz"
-            onClick={onClose}
-            className="mt-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
-          >
-            <HelpCircle className="h-5 w-5" aria-hidden="true" />
-            AI Quiz
-          </Link>
-          <Link
-            to="/favorites"
-            onClick={onClose}
-            className="mt-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
-          >
-            <Heart className="h-5 w-5" aria-hidden="true" />
-            Favorites
-          </Link>
         </div>
 
         <nav className="scrollbar-hidden flex-1 overflow-y-auto p-3">
           {loading ? <HistorySkeleton /> : null}
 
           {!loading && !conversationList.length ? (
-            <div className="rounded-lg border border-dashed border-slate-700 bg-slate-800 p-4 text-sm leading-6 text-slate-400">
+            <div className="rounded-lg border border-dashed border-cream-200 bg-cream p-4 text-sm leading-6 text-[#607D8B]">
               No chat history yet.
             </div>
           ) : null}
@@ -175,16 +159,16 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           ) : null}
 
           {error ? (
-            <p className="mt-3 rounded-lg bg-red-50 p-3 text-xs font-medium leading-5 text-red-700">{error}</p>
+            <p className="mt-3 rounded-lg bg-brand-50 p-3 text-xs font-medium leading-5 text-brand-700">{error}</p>
           ) : null}
         </nav>
 
-        <div className="border-t border-slate-800 p-4">
+        <div className="border-t border-cream-200 p-4">
           {user?.role === "admin" ? (
             <Link
               to="/admin"
               onClick={onClose}
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
+              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-[#607D8B] transition hover:bg-brand-50 hover:text-brand-700"
             >
               <Shield className="h-5 w-5" aria-hidden="true" />
               Admin
@@ -217,8 +201,10 @@ function HistorySkeleton() {
         Loading history
       </div>
       {[0, 1, 2, 3, 4].map((item) => (
-        <div key={item} className="h-9 animate-pulse rounded-lg bg-slate-100" />
+        <div key={item} className="h-9 animate-pulse rounded-lg bg-brand-50" />
       ))}
     </div>
   );
 }
+
+

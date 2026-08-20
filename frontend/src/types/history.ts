@@ -6,6 +6,7 @@ export interface HistoryMessage {
   id?: string;
   role: HistoryMessageRole;
   content: string;
+  imageUrl?: string;
   answer?: AiAnswer;
   created_at?: string;
 }

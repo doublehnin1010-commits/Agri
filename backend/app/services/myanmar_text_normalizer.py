@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import logging
 import re
@@ -26,8 +26,8 @@ Rules:
 MYANMAR_NORMALIZER_USER_PROMPT = """Convert romanized Myanmar phonetic text into Myanmar Unicode.
 
 Examples:
-mì je taun ca pa le -> ငါးမရ ရေချိုးပြန်
-mingalar par -> မင်္ဂလာပါ
+mÃ¬ je taun ca pa le -> á€„á€«á€¸á€™á€› á€›á€±á€á€»á€­á€¯á€¸á€•á€¼á€”á€º
+mingalar par -> á€™á€„á€ºá€¹á€‚á€œá€¬á€•á€«
 
 Input:
 {text}
@@ -40,7 +40,7 @@ _TOKEN_RE = re.compile(r"[A-Za-z\u00c0-\u024f']+")
 _STRONG_PHONETIC_RE = re.compile(r"[\u00e0-\u00ff\u0100-\u024f]")
 
 # Common tokens in informal romanized Myanmar. A conservative threshold is
-# used below so ordinary English text is not sent to Ollama.
+# used below so ordinary English text is not sent through Myanmar normalization.
 _PHONETIC_MARKERS = frozenset(
     {
         "mingalar",
@@ -72,8 +72,8 @@ _PHONETIC_MARKERS = frozenset(
 
 _CACHE_MAX_ITEMS = 512
 _KNOWN_NORMALIZATIONS = {
-    "mì je taun ca pa le": "ငါးမရ ရေချိုးပြန်",
-    "mingalar par": "မင်္ဂလာပါ",
+    "mÃ¬ je taun ca pa le": "á€„á€«á€¸á€™á€› á€›á€±á€á€»á€­á€¯á€¸á€•á€¼á€”á€º",
+    "mingalar par": "á€™á€„á€ºá€¹á€‚á€œá€¬á€•á€«",
 }
 _cache: OrderedDict[str, str] = OrderedDict()
 _cache_lock = threading.Lock()
@@ -165,3 +165,4 @@ def _clear_normalization_cache() -> None:
 
     with _cache_lock:
         _cache.clear()
+

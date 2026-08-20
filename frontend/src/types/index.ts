@@ -1,4 +1,4 @@
-export type UserRole = "user" | "admin";
+﻿export type UserRole = "user" | "admin";
 
 export interface User {
   id?: string;
@@ -28,27 +28,24 @@ export interface LoginPayload {
 }
 
 export interface SourceItem {
-  id?: string | null;
-  keyword?: string | null;
-  category?: string | null;
-  proverb?: string | null;
-  meaning?: string | null;
-  english_meaning?: string | null;
-  example?: string | null;
+  document_id?: string | null;
+  filename?: string | null;
+  file_type?: string | null;
+  chunk_id?: number | string | null;
+  page_number?: number | null;
+  source?: string | null;
+  preview?: string | null;
   score?: number | null;
+  similarity?: number | null;
 }
 
 export interface AiAnswer {
-  proverb_id?: string | null;
-  proverb?: string | null;
+  answer?: string | null;
+  language?: "my" | "en" | string | null;
+  sources?: SourceItem[];
+  error?: string | null;
   meaning_simple_mm?: string | null;
   meaning?: string | null;
-  example_mm?: string | null;
-  example?: string | null;
-  language?: "my" | "en" | string | null;
-  image_url?: string | null;
-  image_prompt?: string | null;
-  sources?: SourceItem[];
   [key: string]: unknown;
 }
 
@@ -56,6 +53,7 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  imageUrl?: string;
   answer?: AiAnswer;
   createdAt: string;
 }
@@ -71,105 +69,4 @@ export interface Conversation {
   title: string;
   createdAt: string;
   messages: ChatMessage[];
-}
-
-export interface Proverb {
-  id: string;
-  keyword?: string | null;
-  category?: string | null;
-  proverb: string;
-  meaning?: string | null;
-  english_meaning?: string | null;
-  example?: string | null;
-}
-
-export interface FavoriteStatus {
-  message?: string | null;
-  favorite: boolean;
-}
-
-export interface FavoriteProverb extends Proverb {
-  created_at: string;
-}
-
-export type QuizDifficulty = "easy" | "medium" | "hard";
-
-export type QuizQuestionType =
-  | "multiple_choice"
-  | "meaning_identification"
-  | "situation_matching"
-  | "fill_in_the_blank";
-
-export interface QuizStartPayload {
-  category?: string;
-  difficulty?: QuizDifficulty;
-  question_count: number;
-}
-
-export interface QuizQuestion {
-  id: number;
-  type: QuizQuestionType;
-  proverb: string;
-  question: string;
-  options: string[];
-}
-
-export interface QuizStartResponse {
-  quiz_id: string;
-  questions: QuizQuestion[];
-}
-
-export interface QuizSubmitPayload {
-  quiz_id: string;
-  answers: Array<{
-    question_id: number;
-    selected: number;
-  }>;
-}
-
-export interface QuizResultItem {
-  question_id: number;
-  correct: boolean;
-  correct_answer: number;
-  selected?: number | null;
-  explanation: string;
-}
-
-export interface QuizSubmitResponse {
-  score: number;
-  total: number;
-  percentage: number;
-  results: QuizResultItem[];
-  recommended_proverbs: Proverb[];
-}
-
-export interface ImportResult {
-  success: boolean;
-  documents_imported: number;
-  embeddings_created: number;
-  failed: number;
-  processing_time_seconds: number;
-}
-
-export interface ImportJobUploadResponse {
-  job_id: string;
-  status: string;
-  message: string;
-}
-
-export interface ImportJobProgress {
-  success?: boolean;
-  job_id: string;
-  status: "uploaded" | "processing" | "embedding" | "completed" | "failed";
-  current?: number;
-  total?: number;
-  progress?: number;
-  step?: string;
-  failed?: number;
-  estimated_remaining?: number;
-  documents_imported?: number;
-  embeddings_created?: number;
-  documents?: number;
-  processing_time_seconds?: number;
-  error?: string;
 }
