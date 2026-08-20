@@ -36,8 +36,8 @@ export function RegisterPage() {
   return (
     <div className="grid overflow-hidden rounded-lg border border-cream-200 bg-white shadow-soft lg:grid-cols-[1.05fr_0.95fr]">
       <section className="bg-brand-50 px-6 py-7 sm:px-8">
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-brand-700 text-white shadow-sm">
-          <Sprout className="h-6 w-6" aria-hidden="true" />
+        <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-brand-700 shadow-sm">
+          <img src="/doh-oo-gyi.png" alt="တို့ဦးကြီး logo" className="h-full w-full object-cover" />
         </div>
         <h1 className="mt-5 text-3xl font-bold leading-tight text-brand-700">တို့ဦးကြီး</h1>
         <h2 className="mt-2 text-lg font-semibold text-[#263238]">စိုက်ပျိုးရေး AI အကူအညီပေးသူ</h2>

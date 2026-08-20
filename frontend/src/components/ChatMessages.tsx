@@ -1,4 +1,4 @@
-﻿import { Loader2, Sprout } from "lucide-react";
+﻿import { Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useEffect, useRef } from "react";
 import { ChatBubble } from "./ChatBubble";
@@ -46,8 +46,8 @@ export function ChatMessages({
     return (
       <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center ">
         <div className="rounded-lg border border-cream-200 bg-white px-5 py-8 text-center shadow-sm sm:px-8">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
-            <Sprout className="h-7 w-7" aria-hidden="true" />
+          <div className="mx-auto flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg bg-brand-700 shadow-sm">
+            <img src="/doh-oo-gyi.png" alt="တို့ဦးကြီး logo" className="h-full w-full object-cover" />
           </div>
           <h2 className="mt-4 text-xl font-bold text-[#263238] sm:text-2xl">{emptyStateTitle}</h2>
           <div className="mx-auto mt-3 max-w-2xl text-left text-sm leading-7 text-[#607D8B]">
