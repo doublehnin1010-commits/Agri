@@ -1,4 +1,4 @@
-from motor.motor_asyncio import AsyncIOMotorClient
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
 
 from app.core.config import settings
 
@@ -24,4 +24,8 @@ def get_db():
     if not mongo.client:
         raise RuntimeError("MongoDB is not connected")
     return mongo.client[settings.mongodb_db_name]
+
+
+def get_gridfs_bucket() -> AsyncIOMotorGridFSBucket:
+    return AsyncIOMotorGridFSBucket(get_db(), bucket_name="chat_images")
 

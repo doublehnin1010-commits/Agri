@@ -12,7 +12,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 Copy-Item .env.example .env
-uvicorn app.main:app --reload
+python -m app.main
 ```
 
 Required `.env` values:

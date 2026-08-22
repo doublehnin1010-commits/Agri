@@ -20,7 +20,6 @@ export function ChatBubble({ message }: ChatBubbleProps) {
       <div className={`text-sm leading-7 ${isUser ? "max-w-[min(680px,85%)] rounded-lg bg-brand-600 px-4 py-3 text-white shadow-sm" : "min-w-0 flex-1 rounded-lg border border-cream-200 bg-white px-5 py-5 text-[#263238] shadow-sm sm:px-6"}`}>
         {isUser ? (
           <div>
-            {message.imageUrl ? <img src={message.imageUrl} alt="Uploaded agriculture image" className="mb-3 max-h-72 max-w-full rounded-lg object-contain" /> : null}
             <p className="whitespace-pre-wrap break-words text-[15px] leading-8">{message.content.replace(/^\[Image attached\]\n?/, "")}</p>
           </div>
         ) : (

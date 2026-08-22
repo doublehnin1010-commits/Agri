@@ -46,3 +46,9 @@ async def on_shutdown():
 @app.get("/health")
 async def health():
     return {"ok": True, "app": settings.app_name, "env": settings.environment}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="127.0.0.1", port=8000)

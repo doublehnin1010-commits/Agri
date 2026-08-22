@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from PIL import Image, UnidentifiedImageError
 
 from app.core.deps import get_current_user_id
-from app.db.mongodb import get_db
+from app.db.mongodb import get_db, get_gridfs_bucket
 from app.models.chat import ChatRequest, ChatResponse
 from app.services.rag import arag_answer, arag_image_answer
 from app.core.config import settings
@@ -14,10 +14,20 @@ from app.core.config import settings
 router = APIRouter()
 
 
-def _message(role: str, content: str, created_at: datetime, answer: dict | None = None) -> dict:
+def _message(
+    role: str,
+    content: str,
+    created_at: datetime,
+    answer: dict | None = None,
+    image_id: ObjectId | None = None,
+    image_content_type: str | None = None,
+) -> dict:
     item = {"role": role, "content": content, "created_at": created_at}
     if answer is not None:
         item["answer"] = answer
+    if image_id is not None:
+        item["image_id"] = image_id
+        item["image_content_type"] = image_content_type
     return item
 
 
@@ -133,6 +143,11 @@ async def image_chat(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Question must be 2000 characters or fewer.")
     image_bytes, mime_type = await _read_validated_image(image)
     answer = await arag_image_answer(question.strip(), image_bytes, mime_type)
+    image_id = await get_gridfs_bucket().upload_from_stream(
+        image.filename or "uploaded-image",
+        BytesIO(image_bytes),
+        metadata={"user_id": user_id, "content_type": mime_type},
+    )
 
     db = get_db()
     history = db["chat_history"]
@@ -143,7 +158,7 @@ async def image_chat(
         conversation = await history.find_one({"_id": object_id, "user_id": user_id})
 
     display_question = question.strip() or "Please analyze this agriculture image."
-    user_message = _message("user", f"[Image attached]\n{display_question}", now)
+    user_message = _message("user", f"[Image attached]\n{display_question}", now, image_id=image_id, image_content_type=mime_type)
     assistant_message = _message("assistant", _answer_to_text(answer), now, answer)
     if conversation:
         existing_messages = conversation.get("messages") or []

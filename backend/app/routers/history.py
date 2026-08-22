@@ -6,6 +6,13 @@ from app.core.deps import get_current_user_id
 from app.db.mongodb import get_db
 
 
+def _serialize_message(message: dict) -> dict:
+    serialized = dict(message)
+    if serialized.get("image_id") is not None:
+        serialized["image_id"] = str(serialized["image_id"])
+    return serialized
+
+
 router = APIRouter()
 
 
@@ -41,7 +48,7 @@ async def history(limit: int = 30, user_id: str = Depends(get_current_user_id)):
             "created_at": item["created_at"],
         }
         if item.get("messages"):
-            normalized_items.append({**base, "messages": item["messages"]})
+            normalized_items.append({**base, "messages": [_serialize_message(message) for message in item["messages"]]})
         else:
             normalized_items.append(
                 {

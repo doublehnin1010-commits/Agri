@@ -24,7 +24,7 @@ export function ChatPage() {
 
   const messages = currentConversation?.messages ?? [];
   const title = useMemo(
-    () => (currentConversation ? getConversationTitle(currentConversation) : "New chat"),
+    () => (currentConversation ? getConversationTitle(currentConversation) : "Ask your first question"),
     [currentConversation],
   );
 
@@ -69,7 +69,6 @@ export function ChatPage() {
         id: makeId("user"),
         role: "user",
         content: selectedImage ? `[Image attached]\n${displayText}` : trimmed,
-        imageUrl: selectedImage ? imagePreview ?? undefined : undefined,
         created_at: new Date().toISOString(),
       };
 
@@ -202,7 +201,7 @@ export function ChatPage() {
                 className={`max-h-28 min-h-10 flex-1 resize-none border-0 bg-transparent px-0 py-2 text-sm leading-6 text-[#263238] outline-none placeholder:text-[#607D8B] sm:min-h-9 ${
                   isMobileVoiceCapture ? "hidden sm:block" : ""
                 }`}
-                placeholder="မေးချင်တာကို ရိုက်ထည့်ပါ..."
+                placeholder="သီးနှံ၊ အပင်ရောဂါ၊ မြေဩဇာအကြောင်း မေးပါ..."
               />
               <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-end">
                 <input ref={imageInputRef} type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" className="sr-only" onChange={handleImageChange} />

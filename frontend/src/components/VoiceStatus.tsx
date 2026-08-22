@@ -18,6 +18,8 @@ const STATUS_LABELS: Record<VoiceConversationStatus, string> = {
 };
 
 export function VoiceStatus({ status, audioLevel, compact = false }: VoiceStatusProps) {
+  if (status === "idle") return null;
+
   const level = Math.min(1, Math.max(0, audioLevel * 12));
   const bars = [0.35, 0.6, 0.9, 0.55, 0.4];
 

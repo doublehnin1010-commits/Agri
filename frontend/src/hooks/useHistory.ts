@@ -86,7 +86,10 @@ export const useHistory = create<HistoryState>((set, get) => ({
       messages: [...(current?.messages ?? []), message],
     };
     nextConversation.title = getConversationTitle(nextConversation);
-    set({ currentConversation: nextConversation });
+    const conversationList = current
+      ? get().conversationList
+      : [nextConversation, ...get().conversationList.filter((conversation) => conversation.id !== "draft")];
+    set({ currentConversation: nextConversation, conversationList });
   },
 
   updateMessageAnswer: (messageId, answer) => {

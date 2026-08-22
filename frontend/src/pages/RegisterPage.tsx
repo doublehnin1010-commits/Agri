@@ -40,13 +40,11 @@ export function RegisterPage() {
           <img src="/doh-oo-gyi.png" alt="တို့ဦးကြီး logo" className="h-full w-full object-cover" />
         </div>
         <h1 className="mt-5 text-3xl font-bold leading-tight text-brand-700">တို့ဦးကြီး</h1>
-        <h2 className="mt-2 text-lg font-semibold text-[#263238]">စိုက်ပျိုးရေး AI အကူအညီပေးသူ</h2>
+        <h2 className="mt-2 text-lg font-semibold text-[#263238]">စိုက်ပျိုးရေးအကြံပေး AI</h2>
         <p className="mt-4 text-sm leading-7 text-[#607D8B]">
-          သင့်စိုက်ပျိုးရေးမေးခွန်းများအတွက် ယုံကြည်စိတ်ချရသော အဖြေများကို လွယ်ကူမြန်ဆန်စွာ ရယူနိုင်ပါသည်။
+         သီးနှံစိုက်ပျိုးခြင်း၊ အပင်ရောဂါနှင့် မြေဩဇာဆိုင်ရာ အကြံပြုချက်များကို လွယ်ကူမြန်ဆန်စွာ ရယူနိုင်ပါသည်။
         </p>
-        <p className="mt-3 text-sm leading-7 text-[#607D8B]">
-          မြန်မာလိုဖြစ်ဖြစ် English လိုဖြစ်ဖြစ် မေးနိုင်ပါသည်။
-        </p>
+        
 
         <div className="mt-6 border-t border-brand-100 pt-5">
           <p className="text-sm font-bold text-brand-700">လုပ်ဆောင်ချက်များ</p>

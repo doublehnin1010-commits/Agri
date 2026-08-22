@@ -6,7 +6,7 @@
       </div>
       <div className="min-w-0">
         <p className="truncate text-sm font-bold text-[#263238]">တို့ဦးကြီး</p>
-        <p className="truncate text-xs font-medium text-[#607D8B]">စိုက်ပျိုးရေး AI အကူအညီပေးသူ</p>
+        <p className="truncate text-xs font-medium text-[#607D8B]">စိုက်ပျိုးရေးအကြံပေး AI</p>
       </div>
     </div>
   );

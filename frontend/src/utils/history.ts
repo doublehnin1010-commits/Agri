@@ -9,7 +9,10 @@ const GROUP_LABELS: Record<HistoryGroupKey, string> = {
 
 export function getConversationTitle(conversation: Pick<HistoryConversation, "title" | "messages">): string {
   const existingTitle = conversation.title?.trim();
-  const firstUserMessage = conversation.messages.find((message) => message.role === "user")?.content.trim();
+  const firstUserMessage = conversation.messages
+    .find((message) => message.role === "user")
+    ?.content.replace(/^\[Image attached\]\n?/, "")
+    .trim();
   return truncateTitle(existingTitle || firstUserMessage || "Untitled conversation");
 }
 

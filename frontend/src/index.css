@@ -15,7 +15,7 @@
   }
 
   body {
-    @apply bg-cream text-[#263238] antialiased;
+    @apply bg-cream font-sans text-[#263238] antialiased;
   }
 
   button,

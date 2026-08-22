@@ -5,12 +5,12 @@ export default {
     extend: {
       fontFamily: {
         sans: [
-          "Inter",
           "Noto Sans Myanmar",
           "ui-sans-serif",
           "system-ui",
           "sans-serif",
         ],
+        display: ["Oswald", "Noto Sans Myanmar", "ui-sans-serif", "sans-serif"],
       },
       colors: {
         cream: {

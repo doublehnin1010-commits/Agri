@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 OUT_OF_DOMAIN_MY = "ဒီစနစ်က စိုက်ပျိုးရေး၊ သီးနှံ၊ မြေဩဇာ၊ ရောဂါပိုးမွှား၊ ရေသွင်းရေထုတ် စတဲ့ မေးခွန်းများအတွက်သာ ဖြေကြားပေးပါတယ်။"
 OUT_OF_DOMAIN_EN = "This assistant only answers agriculture, farming, crop, soil, fertilizer, irrigation, pest, and plant disease questions."
-GEMINI_UNAVAILABLE_MY = "စိုက်ပျိုးရေးမေးခွန်းဖြစ်ပေမယ့် လက်ရှိ Gemini ဖြင့် အဖြေထုတ်ပေးရာမှာ ပြဿနာရှိနေပါတယ်။ ခဏကြာပြီး ပြန်မေးကြည့်ပါ။"
-GEMINI_UNAVAILABLE_EN = "This is an agriculture question, but Gemini is currently unavailable. Please try again later."
+GEMINI_UNAVAILABLE_MY = "စိုက်ပျိုးရေးမေးခွန်းဖြစ်ပေမယ့် လက်ရှိ  အဖြေထုတ်ပေးရာမှာ ပြဿနာရှိနေပါတယ်။ ခဏကြာပြီး ပြန်မေးကြည့်ပါ။"
+GEMINI_UNAVAILABLE_EN = "This is an agriculture question, but  currently unavailable. Please try again later."
 IMAGE_NEEDS_BETTER_MY = "ပုံက အနည်းငယ်မရှင်းလင်းတဲ့အတွက် အတိအကျ ခန့်မှန်းပေးဖို့ ခက်ပါတယ်။\n\nထိခိုက်နေတဲ့ အရွက်/အပင်အစိတ်အပိုင်းကို ပိုနီးကပ်ပြီး ရှင်းလင်းတဲ့ပုံတစ်ပုံ ထပ်တင်ပေးပါ။"
 IMAGE_NEEDS_BETTER_EN = "The image is not clear enough to make a useful estimate. Please upload a sharper, closer photo showing the affected plant part."
 IMAGE_NOT_AGRICULTURE_MY = "ဒီပုံမှာ စိုက်ပျိုးရေးနှင့် သက်ဆိုင်သော အရာကို မတွေ့ရပါ။ အပင်၊ အရွက်၊ အသီး၊ မြေ သို့မဟုတ် ပိုးမွှားပုံကို တင်ပေးပါ။"
@@ -47,6 +47,10 @@ OUT_OF_DOMAIN_EN_TERMS = {
 }
 
 OUT_OF_DOMAIN_MY_TERMS = ["ပရိုဂရမ်", "ကုဒ်", "ဝက်ဘ်ဆိုက်", "နိုင်ငံရေး", "ဘောလုံး", "ရုပ်ရှင်", "သင်္ချာ", "ကွန်ပျူတာ"]
+CREATOR_QUESTION_TERMS = (
+    "who created", "who made", "who developed", "who built", "creator", "developer", "portfolio",
+    "ဘယ်သူ ဖန်တီး", "ဘယ်သူဖန်တီး", "ဘယ်သူရေး", "ဖန်တီးသူ",
+)
 
 
 def _language_from_question(question: str) -> str:
@@ -68,6 +72,11 @@ def _is_agriculture_question(question: str) -> bool:
     if has_myanmar:
         return True
     return False
+
+
+def _is_creator_question(question: str) -> bool:
+    normalized = " ".join((question or "").lower().split())
+    return any(term in normalized for term in CREATOR_QUESTION_TERMS)
 
 
 async def classify_user_intent(question: str) -> dict[str, Any]:
@@ -130,6 +139,13 @@ No relevant uploaded document context was found. This is still an agriculture qu
 
 async def arag_answer(user_question: str, previous_answer: dict[str, Any] | None = None, memory: dict[str, Any] | None = None) -> dict[str, Any]:
     language = _language_from_question(user_question)
+    if _is_creator_question(user_question):
+        return {
+            "answer": f"This AI was created by {settings.creator_name}.\n\nPortfolio: {settings.creator_portfolio_url}",
+            "sources": [],
+            "language": language,
+            "intent": "creator_question",
+        }
     if not _is_agriculture_question(user_question):
         return {"answer": OUT_OF_DOMAIN_MY if language == "my" else OUT_OF_DOMAIN_EN, "sources": [], "language": language, "intent": "out_of_domain"}
 
