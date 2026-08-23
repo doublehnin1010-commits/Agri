@@ -1,15 +1,18 @@
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.core.deps import get_current_user_id
-from app.db.mongodb import get_db
+from app.db.mongodb import get_db, get_gridfs_bucket
 
 
 def _serialize_message(message: dict) -> dict:
     serialized = dict(message)
     if serialized.get("image_id") is not None:
-        serialized["image_id"] = str(serialized["image_id"])
+        image_id = str(serialized["image_id"])
+        serialized["image_id"] = image_id
+        serialized["image_url"] = f"/api/v1/history/images/{image_id}"
     return serialized
 
 
@@ -61,6 +64,29 @@ async def history(limit: int = 30, user_id: str = Depends(get_current_user_id)):
     return {
         "items": normalized_items
     }
+
+
+@router.get("/history/images/{image_id}")
+async def history_image(image_id: str, user_id: str = Depends(get_current_user_id)):
+    try:
+        object_id = ObjectId(image_id)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image id") from exc
+
+    message = await get_db()["chat_history"].find_one(
+        {"user_id": user_id, "messages.image_id": object_id},
+        {"_id": 1},
+    )
+    if message is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    try:
+        stream = await get_gridfs_bucket().open_download_stream(object_id)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found") from exc
+
+    content_type = (stream.metadata or {}).get("content_type", "application/octet-stream")
+    return StreamingResponse(stream, media_type=content_type)
 
 
 @router.patch("/history/{conversation_id}")

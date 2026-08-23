@@ -1,4 +1,4 @@
-import { apiClient } from "../api/client";
+import { apiClient, resolveApiAssetUrl } from "../api/client";
 import type { AiAnswer } from "../types";
 import type { HistoryConversation, HistoryMessage, LegacyHistoryItem } from "../types/history";
 import { answerToText, makeId } from "../utils/answer";
@@ -66,5 +66,6 @@ function normalizeMessage(message: HistoryMessage): HistoryMessage {
     ...message,
     id: message.id ?? makeId(`history-${message.role}`),
     content,
+    imageUrl: message.imageUrl ? resolveApiAssetUrl(message.imageUrl) : undefined,
   };
 }

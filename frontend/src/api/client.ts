@@ -27,6 +27,11 @@ function resolveApiBaseUrl(): string {
 
 const baseURL = resolveApiBaseUrl();
 
+export function resolveApiAssetUrl(assetUrl: string): string {
+  if (/^(blob:|data:|https?:)/.test(assetUrl)) return assetUrl;
+  return new URL(assetUrl, `${baseURL}/`).toString();
+}
+
 export const apiClient = axios.create({
   baseURL,
   headers: {

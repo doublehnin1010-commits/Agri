@@ -69,6 +69,7 @@ export function ChatPage() {
         id: makeId("user"),
         role: "user",
         content: selectedImage ? `[Image attached]\n${displayText}` : trimmed,
+        imageUrl: selectedImage ? imagePreview ?? undefined : undefined,
         created_at: new Date().toISOString(),
       };
 
