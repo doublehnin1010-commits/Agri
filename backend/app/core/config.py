@@ -64,6 +64,7 @@ class Settings(BaseSettings):
     gemini_stt_max_retries: int = 2
     gemini_stt_retry_base_seconds: float = 1.0
     admin_email: str = ""
+    admin_password: str = ""
     creator_name: str = "Zarni Maung"
     creator_portfolio_url: str = "https://zarnimaung-portfolio.vercel.app/"
 
