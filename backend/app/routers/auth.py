@@ -19,25 +19,30 @@ def _resolve_role(email: str) -> Role:
     return Role.USER
 
 
-@router.post("/register", response_model=UserPublic)
-async def register(payload: UserCreate):
+async def ensure_admin_user():
     db = get_db()
     users = db["users"]
 
-    email = payload.email.lower()
-    existing = await users.find_one({"email": email})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
+    email = settings.admin_email.strip().lower()
+    password = settings.admin_password
 
-    role = _resolve_role(email)
+    if not email or not password:
+        return
+
+    existing = await users.find_one({"email": email})
+
+    if existing:
+        return
+
     doc = {
         "email": email,
-        "name": payload.name.strip(),
-        "password_hash": hash_password(payload.password),
-        "role": role.value,
+        "name": "Administrator",
+        "password_hash": hash_password(password),
+        "role": Role.ADMIN.value,
         "created_at": datetime.now(timezone.utc),
     }
-    res = await users.insert_one(doc)
+
+    await users.insert_one(doc)
     return UserPublic(id=str(res.inserted_id), email=doc["email"], name=doc["name"], role=role)
 
 
