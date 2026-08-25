@@ -42,8 +42,10 @@ async def ensure_admin_user():
         "created_at": datetime.now(timezone.utc),
     }
 
-    await users.insert_one(doc)
-    return UserPublic(id=str(res.inserted_id), email=doc["email"], name=doc["name"], role=role)
+    result = await users.insert_one(doc)
+    if not result:
+        return None
+    return UserPublic(id=str(result.inserted_id), email=doc["email"], name=doc["name"], role=Role.ADMIN)
 
 
 @router.post("/login", response_model=TokenResponse)
